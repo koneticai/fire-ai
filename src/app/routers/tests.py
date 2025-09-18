@@ -24,6 +24,11 @@ try:
     AUTOMERGE_AVAILABLE = True
 except ImportError:
     AUTOMERGE_AVAILABLE = False
+    # Define fallback None values for when automerge is not available
+    Document = None
+    ROOT = None
+    ObjType = None
+    ScalarType = None
 
 router = APIRouter()
 
@@ -107,7 +112,7 @@ async def list_test_sessions(
                 # Decode base64 cursor to get vector_clock
                 cursor_data = json.loads(base64.b64decode(cursor).decode())
                 cursor_condition = "AND vector_clock::text > %s"
-                params.append(json.dumps(cursor_data))
+                params.append(str(cursor_data))
             except (ValueError, json.JSONDecodeError):
                 raise HTTPException(status_code=400, detail="Invalid cursor format")
         
