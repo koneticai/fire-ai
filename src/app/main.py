@@ -108,6 +108,26 @@ app = FastAPI(
 # Configure OpenTelemetry
 FastAPIInstrumentor.instrument_app(app)
 
+# Root endpoint
+@app.get("/")
+async def root():
+    """Root endpoint with API information"""
+    return {
+        "service": "FireMode Compliance Platform",
+        "version": "1.0.0",
+        "status": "running",
+        "architecture": "hybrid_python_go",
+        "endpoints": {
+            "health": "/health",
+            "evidence": "/v1/evidence",
+            "test_results": "/v1/tests/sessions/{session_id}/results",
+            "test_sessions": "/v1/tests/sessions",
+            "rules": "/v1/rules",
+            "docs": "/docs",
+            "openapi": "/openapi.json"
+        }
+    }
+
 # Health check endpoint
 @app.get("/health")
 async def health_check():
