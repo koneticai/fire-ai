@@ -202,8 +202,11 @@ async def proxy_evidence(request: Request, current_user: TokenData = Depends(get
         body = await request.body()
         headers = dict(request.headers)
         
-        # Add user ID header (would normally come from JWT middleware)
-        headers["X-User-ID"] = headers.get("x-user-id", "system")
+        # Add authenticated user ID header for Go service
+        # Remove any client-supplied x-user-id to prevent spoofing
+        headers.pop("x-user-id", None)
+        headers.pop("X-User-ID", None)
+        headers["X-User-ID"] = str(current_user.user_id)
         
         response = await go_service_client.post(
             "/v1/evidence",
@@ -212,10 +215,16 @@ async def proxy_evidence(request: Request, current_user: TokenData = Depends(get
             timeout=30.0
         )
         
+        # Filter response headers to only include safe headers
+        safe_headers = {
+            k: v for k, v in response.headers.items() 
+            if k.lower() in ["content-type", "content-length", "cache-control"]
+        }
+        
         return JSONResponse(
             content=response.json(),
             status_code=response.status_code,
-            headers=dict(response.headers)
+            headers=safe_headers
         )
         
     except httpx.TimeoutException:
@@ -235,8 +244,11 @@ async def proxy_test_results(session_id: str, request: Request, current_user: To
         body = await request.body()
         headers = dict(request.headers)
         
-        # Add user ID header (would normally come from JWT middleware)
-        headers["X-User-ID"] = headers.get("x-user-id", "system")
+        # Add authenticated user ID header for Go service
+        # Remove any client-supplied x-user-id to prevent spoofing
+        headers.pop("x-user-id", None)
+        headers.pop("X-User-ID", None)
+        headers["X-User-ID"] = str(current_user.user_id)
         
         response = await go_service_client.post(
             f"/v1/tests/sessions/{session_id}/results",
@@ -245,10 +257,16 @@ async def proxy_test_results(session_id: str, request: Request, current_user: To
             timeout=30.0
         )
         
+        # Filter response headers to only include safe headers
+        safe_headers = {
+            k: v for k, v in response.headers.items() 
+            if k.lower() in ["content-type", "content-length", "cache-control"]
+        }
+        
         return JSONResponse(
             content=response.json(),
             status_code=response.status_code,
-            headers=dict(response.headers)
+            headers=safe_headers
         )
         
     except httpx.TimeoutException:
