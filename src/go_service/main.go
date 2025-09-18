@@ -525,9 +525,11 @@ func createClassificationAuditLog(ctx context.Context, userID string, input Faul
         oldValuesJSON, _ := json.Marshal(oldValues)
         newValuesJSON, _ := json.Marshal(newValues)
 
-        var ruleIDUsed *string
+        var ruleIDUsed interface{}
         if rule != nil {
-                ruleIDUsed = &rule.ID
+                ruleIDUsed = rule.ID
+        } else {
+                ruleIDUsed = nil
         }
 
         auditLogID := uuid.New().String()
@@ -539,6 +541,7 @@ func createClassificationAuditLog(ctx context.Context, userID string, input Faul
 
         _, err := db.Exec(ctx, query, auditLogID, userID, "CLASSIFY_FAULT", "as1851_rule", ruleIDUsed, string(oldValuesJSON), string(newValuesJSON), clientIP, userAgent)
         if err != nil {
+                log.Printf("Audit log creation failed - auditLogID: %s, userID: %s, error: %v", auditLogID, userID, err)
                 return "", fmt.Errorf("failed to create audit log: %v", err)
         }
 
