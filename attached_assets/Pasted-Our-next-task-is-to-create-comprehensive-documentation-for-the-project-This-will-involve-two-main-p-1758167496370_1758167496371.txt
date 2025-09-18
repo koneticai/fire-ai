@@ -1,0 +1,56 @@
+Our next task is to create comprehensive documentation for the project. This will involve two main parts: creating a high-level README.md file for project setup and enhancing the inline FastAPI code to produce a rich, auto-generated API documentation page.
+
+Part 1: Create Project Documentation
+Create a .env.example file in the root directory. It should list all the necessary environment variables without their values, like this:
+SECRET_KEY=
+PII_ENCRYPTION_KEY=
+DATABASE_URL=
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+Create a README.md file in the root directory and populate it with the following structure and content:
+Markdown
+# FireMode Compliance Platform Backend
+
+This is the backend service for the FireMode Compliance Platform, a hybrid Python/FastAPI and Go application designed for high-performance compliance data management.
+
+## ✨ Features
+- Hybrid Python/FastAPI + Go architecture
+- PostgreSQL database with PII encryption
+- JWT-based authentication
+- CRDT support for conflict-free data merging
+- High-performance endpoints for critical data ingestion
+
+## 🛠️ Tech Stack
+- **Backend:** FastAPI (Python), Go
+- **Database:** PostgreSQL
+- **Dependency Management:** Poetry
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
+- Python 3.11+
+- Go 1.24+
+- Poetry
+
+### 2. Setup
+- Clone the repository.
+- Install Python dependencies: `poetry install`
+- Create a `.env` file by copying the `.env.example` file and populate it with your secrets. The `DATABASE_URL` can be found in the Replit "Secrets" tab after connecting the database.
+
+### 3. Running the Application
+Execute the run script:
+```bash
+bash run.sh
+```
+The API will be available at `http://localhost:8080`.
+
+## 🧪 Running Tests
+- **Unit/Integration Tests:** `poetry run pytest`
+- **Load Tests:** `poetry run locust -f tests/load/locustfile.py`
+
+## 📄 API Documentation
+Once the application is running, full interactive API documentation is available at [/docs](http://localhost:8080/docs).
+Part 2: Enhance API Documentation
+Update src/app/main.py: Add a description and other metadata to the FastAPI instance to give the documentation page a clear title and introduction.
+Update src/app/routers/rules.py and src/app/routers/tests.py: Add summary and description parameters to every endpoint decorator to explain what each one does.
+Update src/app/models.py: Import Field from pydantic and use it to add descriptions and examples to the fields in our key Pydantic models, such as AS1851Rule and TestSession. This will make the request and response schemas in the documentation much clearer.
