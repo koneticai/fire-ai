@@ -164,7 +164,35 @@ class AS1851Rule(AS1851RuleBase):
         description="When this rule version was created"
     )
 
-# Classification models
+# Classification models for v1/classify endpoint
+class FaultDataInput(BaseModel):
+    item_code: str = Field(
+        description="The AS1851 rule code for the item being inspected",
+        examples=["AS1851-2012-FE-01"]
+    )
+    observed_condition: str = Field(
+        description="A machine-readable key for the observed condition",
+        examples=["extinguisher_pressure_low"]
+    )
+
+class ClassificationResult(BaseModel):
+    classification: str = Field(
+        description="The resulting classification based on the rule",
+        examples=["critical_defect"]
+    )
+    rule_applied: str = Field(
+        description="The rule code that was applied",
+        examples=["AS1851-2012-FE-01"]
+    )
+    version_applied: str = Field(
+        description="The specific version of the rule that was applied",
+        examples=["1.2.0"]
+    )
+    audit_log_id: UUID = Field(
+        description="The unique ID for the audit log entry created for this transaction"
+    )
+
+# Legacy classification models (kept for backward compatibility)
 class FaultClassificationRequest(BaseModel):
     evidence_id: UUID
     rule_codes: List[str]
