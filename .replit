@@ -1,4 +1,4 @@
-modules = ["python-3.11", "go-1.24"]
+modules = ["python-3.11", "go-1.24", "postgresql-16"]
 [agent]
 expertMode = true
 integrations = ["python_database:1.0.0"]
@@ -38,3 +38,7 @@ externalPort = 80
 [[ports]]
 localPort = 9090
 externalPort = 3000
+
+[[ports]]
+localPort = 34701
+externalPort = 3001

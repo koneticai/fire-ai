@@ -237,6 +237,64 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
 
+# User profile models
+class UserProfile(BaseModel):
+    id: UUID = Field(
+        description="Unique identifier for the user"
+    )
+    username: str = Field(
+        description="Username for the user account"
+    )
+    email: str = Field(
+        description="Email address for the user"
+    )
+    full_name: str = Field(
+        description="Full name of the user (decrypted)"
+    )
+    is_active: bool = Field(
+        description="Whether the user account is active"
+    )
+    created_at: datetime = Field(
+        description="When the user account was created"
+    )
+
+# Audit log response models
+class AuditLogEntry(BaseModel):
+    id: UUID = Field(
+        description="Unique identifier for the audit log entry"
+    )
+    action: str = Field(
+        description="Action that was performed",
+        examples=["CLASSIFY_FAULT", "CLASSIFY_FAULT_FAILED"]
+    )
+    resource_type: str = Field(
+        description="Type of resource that was acted upon",
+        examples=["as1851_rule", "token"]
+    )
+    resource_id: Optional[UUID] = Field(
+        None,
+        description="ID of the specific resource"
+    )
+    old_values: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Previous values before the action"
+    )
+    new_values: Optional[Dict[str, Any]] = Field(
+        None,
+        description="New values after the action"
+    )
+    ip_address: Optional[str] = Field(
+        None,
+        description="IP address from which the action was performed"
+    )
+    user_agent: Optional[str] = Field(
+        None,
+        description="User agent string from the request"
+    )
+    created_at: datetime = Field(
+        description="When the audit log entry was created"
+    )
+
 # API Response models
 class APIResponse(BaseModel):
     status: str

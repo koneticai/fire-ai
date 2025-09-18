@@ -276,13 +276,14 @@ async def proxy_test_results(session_id: str, request: Request, current_user: To
         raise HTTPException(status_code=503, detail="Performance service error")
 
 # Import and include routers
-from .routers import tests, rules, auth, rules_versioned, classify
+from .routers import tests, rules, auth, rules_versioned, classify, users
 
 app.include_router(auth.router, prefix="/v1/auth")
 app.include_router(tests.router, prefix="/v1/tests")
 app.include_router(rules.router, prefix="/v1/rules")
 app.include_router(rules_versioned.router, prefix="/v2/rules")
 app.include_router(classify.router, prefix="/v1/classify")
+app.include_router(users.router, prefix="/v1/users")
 
 if __name__ == "__main__":
     import uvicorn
