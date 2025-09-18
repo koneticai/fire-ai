@@ -113,7 +113,7 @@ def apply_crdt_changes(doc_bytes: bytes, changes: list) -> bytes:
         
         return json.dumps(doc).encode()
 
-@router.get("/sessions", response_model=TestSessionListResponse)
+@router.get("/sessions", response_model=TestSessionListResponse, summary="List Test Sessions", description="Retrieve paginated list of fire safety test sessions with cursor-based pagination using vector clock")
 async def list_test_sessions(
     limit: int = Query(default=50, ge=1, le=100),
     cursor: Optional[str] = Query(default=None),
@@ -188,7 +188,7 @@ async def list_test_sessions(
             detail=f"Failed to list test sessions: {str(e)}"
         )
 
-@router.post("/sessions", response_model=TestSession)
+@router.post("/sessions", response_model=TestSession, summary="Create Test Session", description="Create a new fire safety test session for a building with CRDT vector clock initialization")
 async def create_test_session(
     session_data: TestSessionCreate,
     current_user: TokenData = Depends(get_current_active_user),
@@ -238,7 +238,7 @@ async def create_test_session(
             detail=f"Failed to create test session: {str(e)}"
         )
 
-@router.get("/sessions/{session_id}", response_model=TestSession)
+@router.get("/sessions/{session_id}", response_model=TestSession, summary="Get Test Session", description="Retrieve a specific fire safety test session by its unique identifier")
 async def get_test_session(
     session_id: UUID,
     current_user: TokenData = Depends(get_current_active_user),
@@ -284,7 +284,7 @@ async def get_test_session(
             detail=f"Failed to get test session: {str(e)}"
         )
 
-@router.post("/sessions/{session_id}/crdt-changes")
+@router.post("/sessions/{session_id}/crdt-changes", summary="Apply CRDT Changes", description="Apply conflict-free replicated data type changes to a test session for distributed collaboration")
 async def apply_session_changes(
     session_id: UUID,
     changes_request: CRDTChangesRequest,
