@@ -1,0 +1,211 @@
+Refactor the platform into a hybrid Python+Go architecture to meet the TDD's performance NFR for the classification endpoint. You will create, build, and run a new Go microservice that handles all classification logic, while the main Python app will orchestrate it.
+
+Step 1: Configure the Replit Environment for Go
+Create a file named replit.nix in the root of your project and add the following content to install the Go toolchain:
+Nix
+# replit.nix
+{ pkgs }: {
+  deps = [
+    pkgs.go
+    pkgs.gopls
+    pkgs.gotools
+    pkgs.python311Packages.poetry
+  ];
+}
+Step 2: Implement the Go Classification Service
+Create the directory src/go_service.
+Create a file at src/go_service/main.go and populate it with the complete Go service code:
+Go
+// src/go_service/main.go
+package main
+
+import (
+	"database/sql"
+	"encoding/json"
+	"log"
+	"net/http"
+	"os"
+	"time"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/satori/go.uuid"
+)
+
+// --- Structs for Data Handling ---
+type FaultDataInput struct {
+	ItemCode          string `json:"item_code"`
+	ObservedCondition string `json:"observed_condition"`
+}
+
+type ClassificationResult struct {
+	Classification   string    `json:"classification"`
+	RuleApplied      string    `json:"rule_applied"`
+	VersionApplied   string    `json:"version_applied"`
+	AuditLogID       uuid.UUID `json:"audit_log_id"`
+}
+
+type AS1851Rule struct {
+	ID        uuid.UUID
+	RuleCode  string
+	Version   string
+	Details   []byte // JSONB as raw bytes
+}
+
+// --- Main Application ---
+func main() {
+	dbURL := os.Getenv("REPLIT_DB_URL")
+	if dbURL == "" {
+		log.Fatal("REPLIT_DB_URL not set")
+	}
+
+	db, err := sql.Open("pgx", dbURL)
+	if err != nil {
+		log.Fatalf("Unable to connect to database: %v\n", err)
+	}
+	defer db.Close()
+
+	http.HandleFunc("/v1/classify", classifyHandler(db))
+	log.Println("Go classification service starting on port 8081...")
+	if err := http.ListenAndServe(":8081", nil); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// --- HTTP Handler & Business Logic ---
+func classifyHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// For now, we assume auth is handled upstream (e.g., by a gateway or the Python app)
+		// A production system would validate a JWT here.
+		userID := r.Header.Get("X-User-ID")
+		if userID == "" {
+			userID = "go_service_unauthenticated" // Default for direct calls
+		}
+
+		var input FaultDataInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		// 1. Find the latest active rule
+		rule, err := findLatestActiveRule(db, input.ItemCode)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		// 2. Apply rule logic
+		var details map[string]string
+		if err := json.Unmarshal(rule.Details, &details); err != nil {
+			http.Error(w, "Failed to parse rule details", http.StatusInternalServerError)
+			return
+		}
+		classification, ok := details[input.ObservedCondition]
+		if !ok {
+			http.Error(w, "Condition not found in rule", http.StatusUnprocessableEntity)
+			return
+		}
+
+		// 3. Create audit log entry
+		inputBytes, _ := json.Marshal(input)
+		auditID, err := createAuditLog(db, userID, rule.ID, inputBytes)
+		if err != nil {
+			http.Error(w, "Failed to create audit log", http.StatusInternalServerError)
+			return
+		}
+
+		// 4. Return response
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(ClassificationResult{
+			Classification:   classification,
+			RuleApplied:      rule.RuleCode,
+			VersionApplied:   rule.Version,
+			AuditLogID:       auditID,
+		})
+	}
+}
+
+// --- Database Helper Functions ---
+func findLatestActiveRule(db *sql.DB, itemCode string) (*AS1851Rule, error) {
+	row := db.QueryRow(`
+		SELECT id, rule_code, version, details FROM as1851_rules
+		WHERE rule_code = $1 AND is_active = TRUE
+		ORDER BY version DESC LIMIT 1`, itemCode)
+
+	var rule AS1851Rule
+	if err := row.Scan(&rule.ID, &rule.RuleCode, &rule.Version, &rule.Details); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, &httpError{"No active rule found", http.StatusNotFound}
+		}
+		return nil, &httpError{err.Error(), http.StatusInternalServerError}
+	}
+	return &rule, nil
+}
+
+func createAuditLog(db *sql.DB, userID string, ruleID uuid.UUID, details []byte) (uuid.UUID, error) {
+	auditID := uuid.NewV4()
+	_, err := db.Exec(`
+		INSERT INTO audit_log (id, timestamp, user_id, action, details, rule_id_used)
+		VALUES ($1, $2, $3, $4, $5, $6)`,
+		auditID, time.Now(), userID, "CLASSIFY_FAULT", details, ruleID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return auditID, nil
+}
+
+// Custom error for HTTP status codes
+type httpError struct {
+	msg string
+	code int
+}
+func (e *httpError) Error() string { return e.msg }
+Create a go.mod file for dependency management:
+Bash
+cd src/go_service && go mod init firemode/classifier && go get github.com/jackc/pgx/v5/stdlib && go get github.com/satori/go.uuid && cd ../..
+Step 3: Update the Build and Run Orchestration
+Create a file named run.sh in the root directory. This will be the new entrypoint for the application:
+Bash
+#!/bin/bash
+set -e
+
+echo "--- Building Go classification service ---"
+go build -o bin/classifier ./src/go_service
+echo "Build complete."
+
+echo "--- Starting Go service in background ---"
+./bin/classifier &
+GO_PID=$!
+echo "Go service started with PID $GO_PID"
+
+echo "--- Starting Python/FastAPI service on port 8080 ---"
+poetry run uvicorn src.app.main:app --host 0.0.0.0 --port 8080
+Make the script executable: chmod +x run.sh
+Update your .replit file to use this new script:
+Ini, TOML
+# .replit
+run = "bash run.sh"
+Step 4: Deprecate the Python Classification Endpoint
+Modify src/app/routers/classify.py to inform users of the new, high-performance endpoint:
+Python
+# src/app/routers/classify.py
+from fastapi import APIRouter, status, Response
+
+router = APIRouter(prefix="/v1/classify", tags=["Classification"])
+
+@router.post("/", status_code=status.HTTP_410_GONE)
+def classification_endpoint_migrated():
+    """
+    This endpoint has been migrated to a high-performance Go service.
+    Please use the service running on port 8081 for classification requests.
+    """
+    return {
+        "status": "Endpoint Migrated",
+        "message": "The classification endpoint is now served by a high-performance Go service running on port 8081.",
+        "new_url": "http://<your-replit-url>:8081/v1/classify"
+    }
