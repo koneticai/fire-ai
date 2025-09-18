@@ -17,7 +17,7 @@ from ..models import (
 )
 from ..dependencies import get_current_active_user, get_database_connection, TokenData
 
-router = APIRouter()
+router = APIRouter(tags=["AS1851 Rules"])
 
 @router.get("/", response_model=List[AS1851Rule], summary="List AS1851 Rules", description="Retrieve all active AS1851 compliance rules available in the system, sorted by rule code")
 async def list_rules(

@@ -30,7 +30,7 @@ except ImportError:
     ObjType = None
     ScalarType = None
 
-router = APIRouter()
+router = APIRouter(tags=["Test Sessions"])
 
 def apply_crdt_changes(doc_bytes: bytes, changes: list) -> bytes:
     """Apply CRDT changes using automerge library"""

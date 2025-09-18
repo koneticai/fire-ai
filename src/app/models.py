@@ -44,17 +44,16 @@ class Building(BuildingBase, TimestampedModel):
 # Test session models
 class TestSessionBase(BaseModel):
     session_name: str = Field(
-        ..., 
-        min_length=1, 
-        max_length=255,
         description="Descriptive name for the fire safety testing session",
-        example="Building A - Q2 2024 Monthly Inspection"
+        example="Building A - Q2 2024 Monthly Inspection",
+        min_length=1, 
+        max_length=255
     )
     status: str = Field(
         default="active", 
-        max_length=50,
         description="Current status of the testing session",
-        example="active"
+        example="active",
+        max_length=50
     )
     session_data: Optional[Dict[str, Any]] = Field(
         default_factory=dict,
@@ -106,18 +105,16 @@ class Evidence(EvidenceBase, TimestampedModel):
 # AS1851 rules models
 class AS1851RuleBase(BaseModel):
     rule_code: str = Field(
-        ..., 
-        min_length=1, 
-        max_length=50,
         description="Unique identifier for the AS1851 rule",
-        example="AS1851-2012-FE-01"
+        example="AS1851-2012-FE-01",
+        min_length=1, 
+        max_length=50
     )
     rule_name: str = Field(
-        ..., 
-        min_length=1, 
-        max_length=255,
         description="Human-readable name for the compliance rule",
-        example="Fire Extinguisher Monthly Inspection"
+        example="Fire Extinguisher Monthly Inspection",
+        min_length=1, 
+        max_length=255
     )
     description: Optional[str] = Field(
         None,
@@ -125,7 +122,6 @@ class AS1851RuleBase(BaseModel):
         example="Validates that fire extinguishers are inspected monthly according to AS1851-2012 standards"
     )
     rule_schema: Dict[str, Any] = Field(
-        ...,
         description="JSON schema defining the validation rules and required fields for compliance",
         example={
             "required_fields": ["pressure_reading", "pin_status", "visual_condition"],

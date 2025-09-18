@@ -161,7 +161,7 @@ app = FastAPI(
 FastAPIInstrumentor.instrument_app(app)
 
 # Root endpoint
-@app.get("/")
+@app.get("/", tags=["Health"])
 async def root():
     """Root endpoint with API information"""
     return {
@@ -181,15 +181,15 @@ async def root():
     }
 
 # Health check endpoint
-@app.get("/health")
+@app.get("/health", tags=["Health"])
 async def health_check():
     """Health check endpoint for the main application"""
     return {"status": "ok", "service": "firemode-backend"}
 
 # Reverse proxy endpoints for Go service
-@app.post("/v1/evidence")
-async def proxy_evidence(request: Request):
-    """Reverse proxy for evidence endpoint to Go service"""
+@app.post("/v1/evidence", tags=["Evidence"], summary="Submit Evidence", description="High-performance evidence submission endpoint (proxied to Go service)")
+async def proxy_evidence(request: Request, current_user: TokenData = Depends(get_current_active_user)):
+    """Reverse proxy for evidence endpoint to Go service with authentication"""
     if not go_service_client:
         raise HTTPException(status_code=503, detail="Performance service unavailable")
     
@@ -220,9 +220,9 @@ async def proxy_evidence(request: Request):
         logger.error(f"Request to Go service failed: {e}")
         raise HTTPException(status_code=503, detail="Performance service error")
 
-@app.post("/v1/tests/sessions/{session_id}/results")
-async def proxy_test_results(session_id: str, request: Request):
-    """Reverse proxy for test results endpoint to Go service"""
+@app.post("/v1/tests/sessions/{session_id}/results", tags=["Evidence"], summary="Submit Test Results", description="High-performance test results submission endpoint (proxied to Go service)")
+async def proxy_test_results(session_id: str, request: Request, current_user: TokenData = Depends(get_current_active_user)):
+    """Reverse proxy for test results endpoint to Go service with authentication"""
     if not go_service_client:
         raise HTTPException(status_code=503, detail="Performance service unavailable")
     
