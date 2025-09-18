@@ -1,0 +1,102 @@
+Complete the TDD-mandated JWT Authorizer by implementing the functional Token Revocation List (RTL) check and a logout endpoint. Follow these steps precisely.
+
+Step 1: Create the Database Model and Migration
+Create a new file at src/app/models/revocation.py and add the following SQLAlchemy model:
+Python
+# src/app/models/revocation.py
+import uuid
+from sqlalchemy import Column, DateTime, func
+from sqlalchemy.dialects.postgresql import UUID
+from ..database.core import Base
+
+class TokenRevocationList(Base):
+    __tablename__ = 'token_revocation_list'
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    jti = Column(UUID(as_uuid=True), unique=True, nullable=False, index=True)
+    revoked_at = Column(DateTime, server_default=func.now(), nullable=False)
+Add the new model to src/app/models/__init__.py so Alembic can detect it:
+Python
+# src/app/models/__init__.py
+from .revocation import TokenRevocationList
+Execute the following shell command to generate the database migration script:
+Bash
+poetry run alembic revision --autogenerate -m "Add token_revocation_list table"
+After the migration file is created, execute this command to apply it to the database:
+Bash
+poetry run alembic upgrade head
+Step 2: Implement the Functional RTL Check
+Modify src/app/dependencies.py to replace the TODO with a functional database check. The file's final content should be:
+Python
+# src/app/dependencies.py
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer
+from jose import JWTError, jwt
+from sqlalchemy.orm import Session
+from . import config, schemas
+from .database.core import get_db
+from .models.revocation import TokenRevocationList
+
+oauth2_scheme = HTTPBearer()
+
+def get_current_active_user(
+    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
+) -> schemas.TokenData:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(
+            token.credentials, config.settings.secret_key, algorithms=[config.settings.algorithm]
+        )
+        token_data = schemas.TokenData(**payload)
+    except JWTError:
+        raise credentials_exception
+
+    # Functional RTL Check
+    revoked_token = db.query(TokenRevocationList).filter(TokenRevocationList.jti == token_data.jti).first()
+    if revoked_token:
+        raise HTTPException(status_code=401, detail="Token has been revoked")
+
+    return token_data
+Step 3: Create the Logout Endpoint
+Create a new file at src/app/routers/auth.py with the following content to handle user logout:
+Python
+# src/app/routers/auth.py
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.orm import Session
+from .. import schemas
+from ..database.core import get_db
+from ..dependencies import get_current_active_user
+from ..models.revocation import TokenRevocationList
+
+router = APIRouter(prefix="/v1/auth", tags=["Auth"])
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+def logout(
+    db: Session = Depends(get_db),
+    token_data: schemas.TokenData = Depends(get_current_active_user),
+):
+    """
+    Revokes the current user's token by adding its JTI to the revocation list.
+    """
+    revoked_token_entry = TokenRevocationList(jti=token_data.jti)
+    db.add(revoked_token_entry)
+    db.commit()
+    return {"message": "Successfully logged out"}
+Step 4: Integrate the New Auth Router
+Modify src/app/main.py to include the new authentication router:
+Python
+# src/app/main.py
+from fastapi import FastAPI
+from .routers import auth # Add this import
+
+app = FastAPI(title="FireMode Compliance Platform")
+
+# Add the new router to the app
+app.include_router(auth.router)
+
+@app.get("/")
+def read_root():
+    return {"status": "ok"}

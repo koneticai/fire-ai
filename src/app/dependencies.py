@@ -159,13 +159,38 @@ async def get_current_active_user(
             exp=datetime.fromtimestamp(exp)
         )
         
-        # TODO: Implement database RTL check here
-        # if token_data.jti in revocation_list:
-        #     raise HTTPException(
-        #         status_code=status.HTTP_401_UNAUTHORIZED,
-        #         detail="Token has been revoked",
-        #         headers={"WWW-Authenticate": "Bearer"},
-        #     )
+        # Functional RTL Check - query database for revoked tokens
+        conn = None
+        try:
+            conn = get_database_connection()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT COUNT(*) 
+                    FROM token_revocation_list 
+                    WHERE token_jti = %s AND expires_at > CURRENT_TIMESTAMP
+                """, (token_data.jti,))
+                
+                result = cursor.fetchone()
+                revoked_count = result[0] if result else 0
+                if revoked_count > 0:
+                    conn.close()
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Token has been revoked",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
+            conn.close()
+        except HTTPException:
+            if conn:
+                conn.close()
+            raise
+        except Exception as e:
+            if conn:
+                conn.close()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Token validation failed"
+            )
         
         # Return token payload if valid and not revoked
         return token_data
