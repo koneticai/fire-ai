@@ -19,7 +19,7 @@ from ..dependencies import get_current_active_user, get_database_connection, Tok
 
 router = APIRouter()
 
-@router.get("/", response_model=List[AS1851Rule])
+@router.get("/", response_model=List[AS1851Rule], summary="List AS1851 Rules", description="Retrieve all active AS1851 compliance rules available in the system, sorted by rule code")
 async def list_rules(
     current_user: TokenData = Depends(get_current_active_user),
     conn = Depends(get_database_connection)
@@ -62,7 +62,7 @@ async def list_rules(
             detail=f"Failed to list rules: {str(e)}"
         )
 
-@router.post("/", response_model=AS1851Rule)
+@router.post("/", response_model=AS1851Rule, summary="Create AS1851 Rule", description="Create a new AS1851 compliance rule with schema definition for fault classification")
 async def create_rule(
     rule_data: AS1851RuleCreate,
     current_user: TokenData = Depends(get_current_active_user),
@@ -121,7 +121,7 @@ async def create_rule(
             detail=f"Failed to create rule: {str(e)}"
         )
 
-@router.get("/{rule_code}", response_model=AS1851Rule)
+@router.get("/{rule_code}", response_model=AS1851Rule, summary="Get AS1851 Rule", description="Retrieve a specific AS1851 rule by its unique rule code")
 async def get_rule(
     rule_code: str,
     current_user: TokenData = Depends(get_current_active_user),
@@ -166,7 +166,7 @@ async def get_rule(
             detail=f"Failed to get rule: {str(e)}"
         )
 
-@router.post("/classify-faults", response_model=FaultClassificationResult)
+@router.post("/classify-faults", response_model=FaultClassificationResult, summary="Classify Faults", description="Apply AS1851 rules to evidence for automated fault classification and compliance assessment")
 async def classify_faults(
     classification_request: FaultClassificationRequest,
     request: Request,
@@ -267,7 +267,7 @@ async def classify_faults(
             detail=f"Failed to classify faults: {str(e)}"
         )
 
-@router.put("/{rule_code}/deactivate", response_model=APIResponse)
+@router.put("/{rule_code}/deactivate", response_model=APIResponse, summary="Deactivate Rule", description="Deactivate an AS1851 rule to prevent it from being used in new fault classifications")
 async def deactivate_rule(
     rule_code: str,
     current_user: TokenData = Depends(get_current_active_user),
