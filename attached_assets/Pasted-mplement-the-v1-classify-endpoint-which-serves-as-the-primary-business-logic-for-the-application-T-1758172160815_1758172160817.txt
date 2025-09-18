@@ -1,0 +1,145 @@
+mplement the v1/classify endpoint, which serves as the primary business logic for the application. This requires creating a new audit_log table, a service layer for the classification logic, and a secure API endpoint that records every transaction.
+
+Step 1: Create the Audit Log Database Model and Migration
+Create a new file at src/app/models/audit.py for the audit log:
+Python
+# src/app/models/audit.py
+import uuid
+from sqlalchemy import (Column, String, DateTime, ForeignKey, func)
+from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.orm import relationship
+from ..database.core import Base
+
+class AuditLog(Base):
+    __tablename__ = 'audit_log'
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    timestamp = Column(DateTime, server_default=func.now(), nullable=False)
+    user_id = Column(String, nullable=False) # User ID from JWT
+    action = Column(String, nullable=False, index=True) # e.g., 'CLASSIFY_FAULT'
+    details = Column(JSONB, nullable=True) # Stores input data for the action
+
+    # Foreign key to the specific version of the rule that was used
+    rule_id_used = Column(UUID(as_uuid=True), ForeignKey('as1851_rules.id'), nullable=False)
+    rule = relationship("AS1851Rule")
+Update src/app/models/__init__.py to include the new model:
+Python
+# src/app/models/__init__.py
+from .revocation import TokenRevocationList
+from .rules import AS1851Rule
+from .audit import AuditLog # Add this import
+Generate the migration script: poetry run alembic revision --autogenerate -m "Add audit_log table"
+Apply the migration: poetry run alembic upgrade head
+Step 2: Define Pydantic Schemas
+Create a new file at src/app/schemas/classification.py:
+Python
+# src/app/schemas/classification.py
+import uuid
+from pydantic import BaseModel, Field
+
+class FaultDataInput(BaseModel):
+    item_code: str = Field(..., example="A1.2b", description="The specific item code from AS1851 being inspected.")
+    observed_condition: str = Field(..., example="extinguisher_pressure_low", description="A machine-readable key for the observed condition.")
+
+class ClassificationResult(BaseModel):
+    classification: str = Field(..., example="critical_defect", description="The resulting classification based on the rule.")
+    rule_applied: str = Field(..., example="A1.2b", description="The rule code that was applied.")
+    version_applied: str = Field(..., example="1.2.0", description="The specific version of the rule that was applied.")
+    audit_log_id: uuid.UUID = Field(..., description="The unique ID for the audit log entry created for this transaction.")
+Step 3: Implement the Classification Service Logic
+Create a new file at src/app/services/classifier.py to house the business logic:
+Python
+# src/app/services/classifier.py
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+from sqlalchemy import desc
+from ..models.rules import AS1851Rule
+from ..schemas.classification import FaultDataInput
+
+def classify_fault(db: Session, fault_data: FaultDataInput) -> (AS1851Rule, str):
+    """
+    Finds the latest active rule and applies its logic to the fault data.
+    Returns the rule object used and the resulting classification.
+    """
+    rule = db.query(AS1851Rule).filter(
+        AS1851Rule.rule_code == fault_data.item_code,
+        AS1851Rule.is_active == True
+    ).order_by(desc(AS1851Rule.version)).first()
+
+    if not rule:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No active rule found for item code '{fault_data.item_code}'."
+        )
+
+    # Apply the rule's logic from the 'details' JSONB field
+    classification = rule.details.get(fault_data.observed_condition)
+
+    if not classification:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Rule {rule.rule_code} v{rule.version} does not define a classification for condition '{fault_data.observed_condition}'."
+        )
+
+    return rule, classification
+Step 4: Create the Classification API Endpoint
+Create a new file src/app/routers/classify.py:
+Python
+# src/app/routers/classify.py
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.orm import Session
+from .. import schemas
+from ..database.core import get_db
+from ..dependencies import get_current_active_user
+from ..models.audit import AuditLog
+from ..services.classifier import classify_fault
+
+router = APIRouter(prefix="/v1/classify", tags=["Classification"])
+
+@router.post("/", response_model=schemas.ClassificationResult, status_code=status.HTTP_200_OK)
+def create_classification(
+    fault_data: schemas.FaultDataInput,
+    db: Session = Depends(get_db),
+    current_user: schemas.TokenData = Depends(get_current_active_user)
+):
+    """
+    Classifies a fault based on the latest active AS1851 rule
+    and creates an immutable audit log of the transaction.
+    """
+    # 1. Get classification and the specific rule version used
+    rule_used, classification_result = classify_fault(db, fault_data)
+
+    # 2. Create the immutable audit log entry
+    audit_entry = AuditLog(
+        user_id=current_user.user_id,
+        action='CLASSIFY_FAULT',
+        details=fault_data.model_dump(),
+        rule_id_used=rule_used.id
+    )
+    db.add(audit_entry)
+    db.commit()
+    db.refresh(audit_entry)
+
+    # 3. Return the result to the user
+    return schemas.ClassificationResult(
+        classification=classification_result,
+        rule_applied=rule_used.rule_code,
+        version_applied=rule_used.version,
+        audit_log_id=audit_entry.id
+    )
+Step 5: Integrate the Router
+Modify src/app/main.py to include the new classification router:
+Python
+# src/app/main.py
+from fastapi import FastAPI
+from .routers import auth, rules, classify # Add classify import
+
+app = FastAPI(title="FireMode Compliance Platform")
+
+app.include_router(auth.router)
+app.include_router(rules.router)
+app.include_router(classify.router) # Add this line
+
+@app.get("/")
+def read_root():
+    return {"status": "ok"}
