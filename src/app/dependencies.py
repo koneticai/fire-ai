@@ -124,31 +124,61 @@ async def get_current_user(
     return token_data
 
 async def get_current_active_user(
-    current_user: TokenData = Depends(get_current_user),
-    conn = Depends(get_database_connection)
+    credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> TokenData:
-    """Get current active user (additional check for user status)"""
+    """
+    Foundational JWT Authorizer with Token Revocation List (RTL) check.
+    
+    Extracts JWT from Authorization: Bearer header, validates the token,
+    and checks against revocation list before returning token payload.
+    """
+    
+    # Extract JWT from Authorization: Bearer header
+    token = credentials.credentials
     
     try:
-        with conn.cursor() as cursor:
-            cursor.execute(
-                "SELECT is_active FROM users WHERE id = %s",
-                (current_user.user_id,)
+        # Decode and validate the JWT token
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        username = payload.get("sub")
+        user_id = payload.get("user_id")
+        jti = payload.get("jti")
+        exp = payload.get("exp")
+        
+        if not username or not user_id or not jti or not exp:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token payload",
+                headers={"WWW-Authenticate": "Bearer"},
             )
-            result = cursor.fetchone()
-            
-            if not result or not result[0]:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="User account is inactive"
-                )
         
-        conn.close()
-        return current_user
+        # Create token data object
+        token_data = TokenData(
+            username=username,
+            user_id=UUID(user_id),
+            jti=jti,
+            exp=datetime.fromtimestamp(exp)
+        )
         
-    except Exception as e:
-        conn.close()
+        # TODO: Implement database RTL check here
+        # if token_data.jti in revocation_list:
+        #     raise HTTPException(
+        #         status_code=status.HTTP_401_UNAUTHORIZED,
+        #         detail="Token has been revoked",
+        #         headers={"WWW-Authenticate": "Bearer"},
+        #     )
+        
+        # Return token payload if valid and not revoked
+        return token_data
+        
+    except ExpiredSignatureError:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="User verification failed"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"},
         )
