@@ -1,0 +1,120 @@
+Implement the v1/users endpoints to provide user profile and compliance history retrieval. This involves creating a new users table to store user data, linking it to the JWT user_id, and building secure, paginated endpoints.
+
+Step 1: Create the User Database Model and Migration
+Create a new file at src/app/models/user.py:
+Python
+# src/app/models/user.py
+import uuid
+from sqlalchemy import Column, String, DateTime, func
+from sqlalchemy.dialects.postgresql import UUID
+from ..database.core import Base
+
+class User(Base):
+    __tablename__ = 'users'
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String, unique=True, index=True, nullable=False)
+    full_name = Column(String, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+Update src/app/models/__init__.py to include the new model:
+Python
+# src/app/models/__init__.py
+from .revocation import TokenRevocationList
+from .rules import AS1851Rule
+from .audit import AuditLog
+from .user import User # Add this import
+Generate the migration script: poetry run alembic revision --autogenerate -m "Add users table"
+Apply the migration: poetry run alembic upgrade head
+Step 2: Define Pydantic Schemas
+Create a new file at src/app/schemas/user.py:
+Python
+# src/app/schemas/user.py
+import uuid
+from datetime import datetime
+from pydantic import BaseModel, EmailStr
+
+class UserBase(BaseModel):
+    email: EmailStr
+    full_name: str | None = None
+
+class User(UserBase):
+    id: uuid.UUID
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+Create a new file at src/app/schemas/audit.py for the audit log response:
+Python
+# src/app/schemas/audit.py
+import uuid
+from datetime import datetime
+from pydantic import BaseModel
+
+class AuditLog(BaseModel):
+    id: uuid.UUID
+    timestamp: datetime
+    action: str
+    details: dict | None
+    rule_id_used: uuid.UUID
+
+    class Config:
+        from_attributes = True
+Step 3: Implement the User API Router
+Create a new file at src/app/routers/users.py:
+Python
+# src/app/routers/users.py
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.orm import Session
+from .. import schemas
+from ..database.core import get_db
+from ..dependencies import get_current_active_user
+from ..models.user import User
+from ..models.audit import AuditLog
+
+router = APIRouter(prefix="/v1/users", tags=["Users"])
+
+@router.get("/me", response_model=schemas.User)
+def get_current_user_profile(
+    db: Session = Depends(get_db),
+    current_user_token: schemas.TokenData = Depends(get_current_active_user)
+):
+    """Retrieves the profile for the currently authenticated user."""
+    user = db.query(User).filter(User.id == current_user_token.user_id).first()
+    if not user:
+        # This case can happen if a user is deleted but their token is still valid.
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+@router.get("/me/audits", response_model=List[schemas.AuditLog])
+def get_user_audit_history(
+    db: Session = Depends(get_db),
+    current_user_token: schemas.TokenData = Depends(get_current_active_user),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500)
+):
+    """
+    Retrieves a paginated history of the current user's compliance activities.
+    """
+    audit_logs = db.query(AuditLog).filter(
+        AuditLog.user_id == str(current_user_token.user_id)
+    ).order_by(AuditLog.timestamp.desc()).offset(skip).limit(limit).all()
+
+    return audit_logs
+Step 4: Integrate the Router
+Modify src/app/main.py to include the new users router:
+Python
+# src/app/main.py
+from fastapi import FastAPI
+from .routers import auth, rules, classify, users # Add users import
+
+app = FastAPI(title="FireMode Compliance Platform")
+
+app.include_router(auth.router)
+app.include_router(rules.router)
+app.include_router(classify.router)
+app.include_router(users.router) # Add this line
+
+@app.get("/")
+def read_root():
+    return {"status": "ok"}
