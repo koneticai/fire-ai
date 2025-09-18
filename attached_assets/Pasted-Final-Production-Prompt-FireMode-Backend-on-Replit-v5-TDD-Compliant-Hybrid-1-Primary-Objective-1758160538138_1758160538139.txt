@@ -1,0 +1,106 @@
+Final Production Prompt: FireMode Backend on Replit (v5 - TDD Compliant Hybrid)
+1. Primary Objective
+Your mission is to build the complete, production-certified, and TDD-compliant backend for the FireMode Compliance Platform within a Replit workspace. This prompt outlines the final, definitive workflow. The implementation will be primarily performed by the Replit Agent, guided by the specific, executable code blocks and instructions provided below.
+2. Core Architectural Mandate (TDD Aligned)
+Target Platform: Replit Autoscale Deployments.
+Hybrid Runtime: The architecture must adhere to the TDD's mandate for a hybrid runtime to meet performance NFRs:
+Python/FastAPI: Serves as the main application entrypoint and handles all standard API endpoints.
+Go: Compiled into a binary and run as a subprocess by the Python application to handle the performance-critical endpoints (/v1/evidence, /v1/tests/sessions/{session_id}/results).
+Database: Replit Managed PostgreSQL, provisioned via the "Databases" tool.
+Workflow: Replit Agent-Driven, using the explicit instructions and code herein to ensure deterministic output.
+3. Step-by-Step Implementation Plan
+Step 3.1: Project Scaffolding (Prompt for Replit Agent)
+"Scaffold a new Python project using the Poetry template. Create a directory structure: src/app/ for the FastAPI application and src/go_service/ for the Go application. The src/app/ structure should include a main.py entrypoint, and subdirectories for routers, models, dependencies, and database."
+
+Step 3.2: Dependency Installation (Prompt for Replit Agent)
+"Using Poetry, add the following libraries with exact versions:
+Ini, TOML
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "0.116.2"
+uvicorn = "0.35.0"
+pydantic = "2.11.9"
+psycopg2-binary = "2.9.10"
+python-jose = {extras = ["cryptography"], version = "3.5.0"}
+cryptography = "46.0.1"
+pandas = "2.3.2"
+opentelemetry-instrumentation-fastapi = "0.46.0" # Latest stable non-beta
+httpx = "0.27.0" # For proxying
+automerge = "0.4.0" # For CRDT
+locust = "2.28.0" # For load testing
+In the src/go_service/ directory, initialize a Go module named firemode-go-service and add the following dependencies: github.com/jackc/pgx/v5 and github.com/gorilla/mux."
+
+Step 3.3: Database Provisioning & Schema Setup
+Human Developer Action: Use the Replit Tools > Databases to create a PostgreSQL database.
+Replit Agent Prompt (Schema & Initialization):
+"1. Create a file at src/app/database/schema.sql. Populate it with the complete, idempotent SQL schema. It must include tables for users (with full_name_encrypted BYTEA), buildings, test_sessions (with vector_clock JSONB), evidence, as1851_rules (with rule_schema JSONB), token_revocation_list, idempotency_keys, and audit_log. Start the script with CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";.
+Create a Python script at src/app/database/init.py to read the DATABASE_URL secret and execute the schema.sql script to initialize the database."
+
+Step 3.4: API Scaffolding (Prompt for Replit Agent)
+"Generate the complete FastAPI application code in src/app/ and the Go service in src/go_service/.
+1. Go Service (src/go_service/main.go): Create an HTTP service that listens on port 9090. It must handle two endpoints: POST /v1/evidence and POST /v1/tests/sessions/{session_id}/results. Implement the SHA-256 validation and idempotency checks within these handlers.
+2. Python FastAPI App (src/app/):
+In main.py: Instantiate the FastAPI app. At startup, it must compile the Go service at src/go_serviceinto a binary and then run it as a background subprocess. Implement a reverse proxy to forward requests for /v1/evidence and /v1/tests/sessions/{session_id}/results to the Go service running on http://localhost:9090. Add a GET /health endpoint that returns {'status': 'ok'}. Configure OpenTelemetry using this exact snippet:
+Python
+
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+# In main.py
+FastAPIInstrumentor.instrument_app(app)
+
+
+In dependencies.py: Create the JWT authorizer with a database query for the RTL check.
+In routers/tests.py: Implement the /v1/tests/sessions endpoint with cursor-based pagination using a base64 encoded vector_clock.
+In routers/rules.py: Implement the classify_faults endpoint. After applying the rule schema, it must insert a record into the audit_log table.
+For the /results endpoint CRDT logic stub (in Python, for reference): Use the automerge-pythonlibrary. Provide a function stub like this:
+Python
+
+import automerge
+# doc_bytes would be loaded from the test_sessions.vector_clock column
+def apply_crdt_changes(doc_bytes: bytes, changes: list) -> bytes:
+    doc = automerge.load(doc_bytes) if doc_bytes else automerge.Doc()
+    doc.change(lambda d: automerge.apply_changes(d, changes))
+    return automerge.save(doc)
+
+
+
+4. Deployment & Testing (.replit and run.sh)
+Create run.sh at the project root:
+Bash
+
+#!/bin/bash
+
+# This is the single entrypoint for the application.
+# The Python app will handle compiling and running the Go service.
+echo "Starting application..."
+poetry run uvicorn src.app.main:app --host 0.0.0.0 --port 8080
+
+
+Create/Update the .replit file:
+Ini, TOML
+
+# .replit
+run = "bash run.sh"
+
+[deployments]
+run = "poetry run python -m src.app.database.init && bash run.sh"
+type = "autoscale"
+
+[deployments.healthcheck]
+path = "/health"
+
+[commands]
+# Command to run unit/integration tests
+test = "poetry run pytest"
+# Command to run performance load tests
+test_load = "poetry run locust -f tests/load/locustfile.py --headless -u 500 -r 10 --run-time 2m"
+
+
+
+5. Load Testing (Prompt for Replit Agent)
+"Create a file at tests/load/locustfile.py. Populate it with a Locust test script that specifically targets the POST /v1/tests/sessions/{session_id}/results endpoint. The test must simulate a high-throughput scenario designed to validate the p95 latency is below 300ms as required by the TDD."
+
+6. Security & Compliance
+PII Encryption: For any PII fields in models.py, use the cryptography library. Provide this agent prompt: "Create a utility in src/app/security.py that uses cryptography.fernet.Fernet to encrypt and decrypt string data using a key from Replit Secrets (PII_ENCRYPTION_KEY)."
+Secrets: All secrets (DATABASE_URL, JWT_SECRET_KEY, PII_ENCRYPTION_KEY) must be stored using the Replit Secrets tool.
+HTTPS: Handled automatically by Replit Deployments.
+
