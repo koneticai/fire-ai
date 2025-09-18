@@ -100,9 +100,61 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="FireMode Compliance Platform",
-    description="Production-grade compliance platform with hybrid Python/Go architecture",
+    description="""
+    ## FireMode Compliance Platform Backend API
+
+    A high-performance, production-grade compliance platform built with hybrid Python/FastAPI and Go architecture for fire safety testing and evidence management.
+
+    ### Key Features:
+    - **Hybrid Architecture**: Python/FastAPI for standard operations + Go service for performance-critical endpoints
+    - **AS1851 Compliance**: Full support for AS1851 fire safety rule management and fault classification
+    - **Evidence Management**: Secure handling of compliance evidence with PII encryption
+    - **CRDT Support**: Conflict-free replicated data types for distributed session data
+    - **High Performance**: p95 latency < 300ms for critical endpoints
+    - **JWT Authentication**: Secure token-based authentication with revocation list support
+
+    ### Performance-Critical Endpoints:
+    - `POST /v1/evidence` - Evidence submission (handled by Go service)
+    - `POST /v1/tests/sessions/{session_id}/results` - Test results submission (handled by Go service)
+
+    ### Standard Endpoints:
+    - Test session management (`/v1/tests/sessions`)  
+    - AS1851 rule management (`/v1/rules`)
+    - Fault classification and compliance checks
+
+    Built for enterprise fire safety compliance with PostgreSQL database, OpenTelemetry monitoring, and comprehensive audit logging.
+    """,
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    contact={
+        "name": "FireMode Compliance Platform",
+        "url": "https://firemode.com"
+    },
+    license_info={
+        "name": "Proprietary",
+    },
+    tags_metadata=[
+        {
+            "name": "Authentication",
+            "description": "JWT-based authentication and user management",
+        },
+        {
+            "name": "Test Sessions", 
+            "description": "CRUD operations for fire safety test sessions with CRDT support",
+        },
+        {
+            "name": "AS1851 Rules",
+            "description": "Management of AS1851 compliance rules and fault classification",
+        },
+        {
+            "name": "Evidence",
+            "description": "High-performance evidence submission and management (Go service)",
+        },
+        {
+            "name": "Health",
+            "description": "System health checks and monitoring endpoints",
+        }
+    ]
 )
 
 # Configure OpenTelemetry
