@@ -6,6 +6,7 @@ import os
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional
+from uuid import UUID
 
 from jose import jwt, JWTError, ExpiredSignatureError
 import psycopg2
@@ -69,7 +70,7 @@ def verify_token(token: str) -> TokenData:
         
         token_data = TokenData(
             username=username,
-            user_id=user_id,
+            user_id=UUID(user_id),
             jti=jti,
             exp=datetime.fromtimestamp(exp)
         )

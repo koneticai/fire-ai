@@ -92,7 +92,26 @@ def apply_crdt_changes(doc_bytes: bytes, changes: list) -> bytes:
     
     except Exception as e:
         # Fallback to simple merge if automerge fails
-        return apply_crdt_changes(doc_bytes, changes)
+        if doc_bytes:
+            doc = json.loads(doc_bytes.decode())
+        else:
+            doc = {}
+        
+        for change in changes:
+            if change.get("operation") == "set":
+                path = change.get("path", [])
+                value = change.get("value")
+                
+                current = doc
+                for key in path[:-1]:
+                    if key not in current:
+                        current[key] = {}
+                    current = current[key]
+                
+                if path:
+                    current[path[-1]] = value
+        
+        return json.dumps(doc).encode()
 
 @router.get("/sessions", response_model=TestSessionListResponse)
 async def list_test_sessions(
@@ -112,7 +131,7 @@ async def list_test_sessions(
                 # Decode base64 cursor to get vector_clock
                 cursor_data = json.loads(base64.b64decode(cursor).decode())
                 cursor_condition = "AND vector_clock::text > %s"
-                params.append(str(cursor_data))
+                params.append(json.dumps(cursor_data))
             except (ValueError, json.JSONDecodeError):
                 raise HTTPException(status_code=400, detail="Invalid cursor format")
         
