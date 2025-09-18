@@ -108,18 +108,29 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Add updated_at triggers to relevant tables
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users 
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_buildings_updated_at BEFORE UPDATE ON buildings 
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_test_sessions_updated_at BEFORE UPDATE ON test_sessions 
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_as1851_rules_updated_at BEFORE UPDATE ON as1851_rules 
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Add updated_at triggers to relevant tables (only if they don't exist)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_users_updated_at') THEN
+        CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users 
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_buildings_updated_at') THEN
+        CREATE TRIGGER update_buildings_updated_at BEFORE UPDATE ON buildings 
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_test_sessions_updated_at') THEN
+        CREATE TRIGGER update_test_sessions_updated_at BEFORE UPDATE ON test_sessions 
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_as1851_rules_updated_at') THEN
+        CREATE TRIGGER update_as1851_rules_updated_at BEFORE UPDATE ON as1851_rules 
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+END$$;
 
 -- Create indexes after tables are created
 CREATE INDEX IF NOT EXISTS idx_test_sessions_vector_clock ON test_sessions USING GIN (vector_clock);
