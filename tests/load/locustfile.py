@@ -158,6 +158,6 @@ class StandardLoadUser(FireModeUser):
     """Standard load pattern for normal operations"""
     weight = 3
 
-class HighThroughputUser(HighThroughputUser):
+class StressTestUser(HighThroughputUser):
     """High throughput pattern for stress testing"""
     weight = 1
