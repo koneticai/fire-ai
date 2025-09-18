@@ -554,21 +554,9 @@ func createClassificationAuditLog(ctx context.Context, userID string, input Faul
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
         `
 
-        // Write debug info to file since logs aren't captured
-        debugFile, _ := os.OpenFile("/tmp/go_debug.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-        if debugFile != nil {
-                debugFile.WriteString(fmt.Sprintf("Attempting audit log - auditLogID: %s, userID: %s\n", auditLogID, userID))
-                debugFile.Close()
-        }
-        
         _, err = db.Exec(ctx, query, auditLogID, userID, "CLASSIFY_FAULT", "as1851_rule", ruleIDUsed, string(oldValuesJSON), string(newValuesJSON), clientIP, userAgent)
         if err != nil {
-                // Write error to debug file
-                debugFile, _ := os.OpenFile("/tmp/go_debug.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-                if debugFile != nil {
-                        debugFile.WriteString(fmt.Sprintf("ERROR: %v\n", err))
-                        debugFile.Close()
-                }
+                log.Printf("Audit log creation failed - auditLogID: %s, userID: %s, error: %v", auditLogID, userID, err)
                 return "", fmt.Errorf("failed to create audit log: %v", err)
         }
 
