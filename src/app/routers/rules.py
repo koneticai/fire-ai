@@ -104,6 +104,7 @@ async def create_rule(
         )
         
     except psycopg2.IntegrityError as e:
+        conn.rollback()
         conn.close()
         if "rule_code" in str(e):
             raise HTTPException(
@@ -115,14 +116,15 @@ async def create_rule(
             detail=f"Database integrity error: {str(e)}"
         )
     except Exception as e:
+        conn.rollback()
         conn.close()
         raise HTTPException(
             status_code=500,
             detail=f"Failed to create rule: {str(e)}"
         )
 
-@router.get("/{rule_code}", response_model=AS1851Rule, summary="Get AS1851 Rule", description="Retrieve a specific AS1851 rule by its unique rule code")
-async def get_rule(
+@router.get("/code/{rule_code}", response_model=AS1851Rule, summary="Get AS1851 Rule by Code", description="Retrieve a specific AS1851 rule by its unique rule code")
+async def get_rule_by_code(
     rule_code: str,
     current_user: TokenData = Depends(get_current_active_user),
     conn = Depends(get_database_connection)
@@ -140,6 +142,7 @@ async def get_rule(
             
             row = cursor.fetchone()
             if not row:
+                conn.close()
                 raise HTTPException(status_code=404, detail="Rule not found")
             
             rule = AS1851Rule(
@@ -267,7 +270,7 @@ async def classify_faults(
             detail=f"Failed to classify faults: {str(e)}"
         )
 
-@router.get("/{rule_id}", response_model=AS1851Rule, summary="Get AS1851 Rule by ID", description="Retrieve a specific AS1851 rule by its unique UUID identifier")
+@router.get("/id/{rule_id}", response_model=AS1851Rule, summary="Get AS1851 Rule by ID", description="Retrieve a specific AS1851 rule by its unique UUID identifier")
 async def get_rule_by_id(
     rule_id: UUID,
     current_user: TokenData = Depends(get_current_active_user),
@@ -286,6 +289,7 @@ async def get_rule_by_id(
             
             row = cursor.fetchone()
             if not row:
+                conn.close()
                 raise HTTPException(status_code=404, detail="Rule not found")
             
             rule = AS1851Rule(
@@ -312,7 +316,7 @@ async def get_rule_by_id(
             detail=f"Failed to get rule: {str(e)}"
         )
 
-@router.put("/{rule_id}", response_model=AS1851Rule, summary="Update AS1851 Rule", description="Update an existing AS1851 rule by its UUID identifier")
+@router.put("/id/{rule_id}", response_model=AS1851Rule, summary="Update AS1851 Rule", description="Update an existing AS1851 rule by its UUID identifier")
 async def update_rule(
     rule_id: UUID,
     rule_data: AS1851RuleCreate,
@@ -326,6 +330,7 @@ async def update_rule(
             # First, check if the rule exists
             cursor.execute("SELECT id FROM as1851_rules WHERE id = %s", (rule_id,))
             if not cursor.fetchone():
+                conn.close()
                 raise HTTPException(status_code=404, detail="Rule not found")
             
             # Update the rule
@@ -347,6 +352,7 @@ async def update_rule(
             
             result = cursor.fetchone()
             if not result:
+                conn.close()
                 raise HTTPException(status_code=404, detail="Rule not found")
             
             updated_rule = AS1851Rule(
@@ -361,11 +367,11 @@ async def update_rule(
             )
             
             conn.commit()
-        
-        conn.close()
-        return updated_rule
+            conn.close()
+            return updated_rule
         
     except psycopg2.IntegrityError as e:
+        conn.rollback()
         conn.close()
         if "rule_code" in str(e):
             raise HTTPException(
@@ -380,6 +386,7 @@ async def update_rule(
         conn.close()
         raise
     except Exception as e:
+        conn.rollback()
         conn.close()
         raise HTTPException(
             status_code=500,
