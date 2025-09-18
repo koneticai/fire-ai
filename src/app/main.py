@@ -12,9 +12,13 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+# Import dependencies needed for authentication
+from .dependencies import get_current_active_user
+from .models import TokenData
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -256,8 +260,8 @@ async def proxy_test_results(session_id: str, request: Request, current_user: To
 # Import and include routers
 from .routers import tests, rules
 
-app.include_router(tests.router, prefix="/v1/tests", tags=["tests"])
-app.include_router(rules.router, prefix="/v1/rules", tags=["rules"])
+app.include_router(tests.router, prefix="/v1/tests")
+app.include_router(rules.router, prefix="/v1/rules")
 
 if __name__ == "__main__":
     import uvicorn
