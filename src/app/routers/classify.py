@@ -1,96 +1,90 @@
 """
 Classification router for FireMode Compliance Platform
-Implements the v1/classify endpoint for fault classification
+High-performance classification endpoint (proxied to Go service)
 """
 
+import httpx
 from fastapi import APIRouter, Depends, status, Request, HTTPException
+from fastapi.responses import JSONResponse
 
 from ..models import FaultDataInput, ClassificationResult, TokenData
-from ..dependencies import get_current_active_user, get_database_connection
-from ..services.classifier import classify_fault, create_audit_log
+from ..dependencies import get_current_active_user
 
 router = APIRouter(tags=["Classification"])
 
+# Global Go service client reference (set by main app)
+go_service_client = None
+
+def set_go_service_client(client: httpx.AsyncClient):
+    """Set the Go service client for this router"""
+    global go_service_client
+    go_service_client = client
+
 @router.post("", response_model=ClassificationResult, status_code=status.HTTP_200_OK,
              summary="Classify Fault",
-             description="Classifies a fault based on the latest active AS1851 rule and creates an immutable audit log of the transaction.")
+             description="High-performance fault classification endpoint (proxied to Go service). Classifies a fault based on the latest active AS1851 rule and creates an immutable audit log of the transaction.")
 async def create_classification(
     fault_data: FaultDataInput,
     request: Request,
-    current_user: TokenData = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    current_user: TokenData = Depends(get_current_active_user)
 ):
     """
+    High-performance fault classification (proxied to Go service).
+    
     Classifies a fault based on the latest active AS1851 rule
     and creates an immutable audit log of the transaction.
     """
-    # Get client metadata for audit logging
-    client_ip = request.client.host if request.client else "unknown"
-    user_agent = request.headers.get("user-agent", "unknown")
+    if not go_service_client:
+        raise HTTPException(status_code=503, detail="High-performance classification service unavailable")
     
     try:
-        # 1. Get classification and the specific rule version used
-        rule_used, classification_result = classify_fault(conn, fault_data)
+        # Prepare request body
+        body = fault_data.model_dump_json()
         
-        # 2. Create the immutable audit log entry for successful classification
-        audit_log_id = create_audit_log(
-            conn,
-            current_user.user_id,
-            fault_data,
-            rule_used,
-            classification_result,
-            client_ip,
-            user_agent,
-            success=True
+        # Prepare headers for Go service
+        headers = dict(request.headers)
+        
+        # Add authenticated user ID header for Go service
+        # Remove any client-supplied x-user-id to prevent spoofing
+        headers.pop("x-user-id", None)
+        headers.pop("X-User-ID", None)
+        headers["X-User-ID"] = str(current_user.user_id)
+        
+        # Add client IP forwarding
+        client_ip = request.client.host if request.client else "unknown"
+        headers["X-Forwarded-For"] = client_ip
+        
+        # Forward the request to Go service
+        response = await go_service_client.post(
+            "/v1/classify",
+            content=body,
+            headers=headers,
+            timeout=30.0
         )
         
-        conn.close()
+        # Filter response headers to only include safe headers
+        safe_headers = {
+            k: v for k, v in response.headers.items() 
+            if k.lower() in ["content-type", "content-length", "cache-control"]
+        }
         
-        # 3. Return the result to the user
-        return ClassificationResult(
-            classification=classification_result,
-            rule_applied=rule_used.rule_code,
-            version_applied=rule_used.version,
-            audit_log_id=audit_log_id
+        # Handle JSON and non-JSON responses from Go service
+        content_type = response.headers.get("content-type", "")
+        if content_type.startswith("application/json"):
+            try:
+                content = response.json()
+            except Exception:
+                content = {"detail": "Invalid JSON response from classification service"}
+        else:
+            content = {"detail": response.text}
+        
+        return JSONResponse(
+            content=content,
+            status_code=response.status_code,
+            headers=safe_headers
         )
         
-    except HTTPException as e:
-        # Log failed classification attempts for compliance
-        try:
-            create_audit_log(
-                conn,
-                current_user.user_id,
-                fault_data,
-                None,  # No rule found/used
-                None,  # No classification
-                client_ip,
-                user_agent,
-                success=False,
-                error_detail=e.detail
-            )
-        except Exception:
-            # If audit logging fails, continue with original error
-            pass
-        conn.close()
-        raise
-    except Exception as e:
-        # Log unexpected errors
-        try:
-            create_audit_log(
-                conn,
-                current_user.user_id,
-                fault_data,
-                None,
-                None,
-                client_ip,
-                user_agent,
-                success=False,
-                error_detail=str(e)
-            )
-        except Exception:
-            pass
-        conn.close()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Classification failed"
-        )
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Classification request timeout")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=503, detail="High-performance classification service error")

@@ -81,6 +81,10 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Go service health check failed: {e}")
         
+        # Set Go service client for classification router
+        from .routers import classify
+        classify.set_go_service_client(go_service_client)
+        
         yield
         
     except Exception as e:
@@ -118,6 +122,7 @@ app = FastAPI(
     - **JWT Authentication**: Secure token-based authentication with revocation list support
 
     ### Performance-Critical Endpoints:
+    - `POST /v1/classify` - Fault classification (handled by Go service)
     - `POST /v1/evidence` - Evidence submission (handled by Go service)
     - `POST /v1/tests/sessions/{session_id}/results` - Test results submission (handled by Go service)
 
@@ -178,6 +183,7 @@ async def root():
             "evidence": "/v1/evidence",
             "test_results": "/v1/tests/sessions/{session_id}/results",
             "test_sessions": "/v1/tests/sessions",
+            "classification": "/v1/classify",
             "rules": "/v1/rules",
             "docs": "/docs",
             "openapi": "/openapi.json"
