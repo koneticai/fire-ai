@@ -7,7 +7,7 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Optional
 
-from jose import jwt
+from jose import jwt, JWTError, ExpiredSignatureError
 import psycopg2
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -55,10 +55,10 @@ def verify_token(token: str) -> TokenData:
     """Verify JWT token and return token data"""
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
-        username: str = payload.get("sub")
-        user_id: str = payload.get("user_id")
-        jti: str = payload.get("jti")
-        exp: int = payload.get("exp")
+        username: str = payload.get("sub") or ""
+        user_id: str = payload.get("user_id") or ""
+        jti: str = payload.get("jti") or ""
+        exp: int = payload.get("exp") or 0
         
         if username is None or user_id is None or jti is None:
             raise HTTPException(
@@ -75,13 +75,13 @@ def verify_token(token: str) -> TokenData:
         )
         return token_data
     
-    except jwt.ExpiredSignatureError:
+    except ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token expired",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    except jwt.JWTError:
+    except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
