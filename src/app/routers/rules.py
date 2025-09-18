@@ -267,6 +267,125 @@ async def classify_faults(
             detail=f"Failed to classify faults: {str(e)}"
         )
 
+@router.get("/{rule_id}", response_model=AS1851Rule, summary="Get AS1851 Rule by ID", description="Retrieve a specific AS1851 rule by its unique UUID identifier")
+async def get_rule_by_id(
+    rule_id: UUID,
+    current_user: TokenData = Depends(get_current_active_user),
+    conn = Depends(get_database_connection)
+):
+    """Get a specific rule by UUID"""
+    
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, rule_code, rule_name, description, rule_schema,
+                       is_active, created_at, updated_at
+                FROM as1851_rules 
+                WHERE id = %s
+            """, (rule_id,))
+            
+            row = cursor.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Rule not found")
+            
+            rule = AS1851Rule(
+                id=row[0],
+                rule_code=row[1],
+                rule_name=row[2],
+                description=row[3],
+                rule_schema=row[4],
+                is_active=row[5],
+                created_at=row[6],
+                updated_at=row[7]
+            )
+        
+        conn.close()
+        return rule
+        
+    except HTTPException:
+        conn.close()
+        raise
+    except Exception as e:
+        conn.close()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get rule: {str(e)}"
+        )
+
+@router.put("/{rule_id}", response_model=AS1851Rule, summary="Update AS1851 Rule", description="Update an existing AS1851 rule by its UUID identifier")
+async def update_rule(
+    rule_id: UUID,
+    rule_data: AS1851RuleCreate,
+    current_user: TokenData = Depends(get_current_active_user),
+    conn = Depends(get_database_connection)
+):
+    """Update an existing AS1851 rule"""
+    
+    try:
+        with conn.cursor() as cursor:
+            # First, check if the rule exists
+            cursor.execute("SELECT id FROM as1851_rules WHERE id = %s", (rule_id,))
+            if not cursor.fetchone():
+                raise HTTPException(status_code=404, detail="Rule not found")
+            
+            # Update the rule
+            cursor.execute("""
+                UPDATE as1851_rules 
+                SET rule_code = %s, rule_name = %s, description = %s, 
+                    rule_schema = %s, is_active = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+                RETURNING id, rule_code, rule_name, description, rule_schema, 
+                         is_active, created_at, updated_at
+            """, (
+                rule_data.rule_code,
+                rule_data.rule_name,
+                rule_data.description,
+                json.dumps(rule_data.rule_schema),
+                rule_data.is_active,
+                rule_id
+            ))
+            
+            result = cursor.fetchone()
+            if not result:
+                raise HTTPException(status_code=404, detail="Rule not found")
+            
+            updated_rule = AS1851Rule(
+                id=result[0],
+                rule_code=result[1],
+                rule_name=result[2],
+                description=result[3],
+                rule_schema=result[4],
+                is_active=result[5],
+                created_at=result[6],
+                updated_at=result[7]
+            )
+            
+            conn.commit()
+        
+        conn.close()
+        return updated_rule
+        
+    except psycopg2.IntegrityError as e:
+        conn.close()
+        if "rule_code" in str(e):
+            raise HTTPException(
+                status_code=400,
+                detail="Rule code already exists"
+            )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Database integrity error: {str(e)}"
+        )
+    except HTTPException:
+        conn.close()
+        raise
+    except Exception as e:
+        conn.close()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update rule: {str(e)}"
+        )
+
 @router.put("/{rule_code}/deactivate", response_model=APIResponse, summary="Deactivate Rule", description="Deactivate an AS1851 rule to prevent it from being used in new fault classifications")
 async def deactivate_rule(
     rule_code: str,

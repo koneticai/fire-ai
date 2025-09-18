@@ -44,25 +44,25 @@ class Building(BuildingBase, TimestampedModel):
 # Test session models
 class TestSessionBase(BaseModel):
     session_name: str = Field(
-        description="Descriptive name for the fire safety testing session",
-        example="Building A - Q2 2024 Monthly Inspection",
         min_length=1, 
-        max_length=255
+        max_length=255,
+        description="Descriptive name for the fire safety testing session",
+        examples=["Building A - Q2 2024 Monthly Inspection"]
     )
     status: str = Field(
         default="active", 
+        max_length=50,
         description="Current status of the testing session",
-        example="active",
-        max_length=50
+        examples=["active"]
     )
     session_data: Optional[Dict[str, Any]] = Field(
         default_factory=dict,
         description="Flexible data storage for session-specific information and test results",
-        example={
+        examples=[{
             "inspector": "John Smith",
             "weather_conditions": "Clear",
             "equipment_tested": ["FE-001", "FE-002"]
-        }
+        }]
     )
 
 class TestSessionCreate(TestSessionBase):
@@ -80,7 +80,7 @@ class TestSession(TestSessionBase, TimestampedModel):
     vector_clock: Optional[Dict[str, Any]] = Field(
         default_factory=dict,
         description="CRDT vector clock for conflict-free distributed updates",
-        example={"actor_1": 5, "actor_2": 3}
+        examples=[{"actor_1": 5, "actor_2": 3}]
     )
     created_by: Optional[UUID] = Field(
         None,
@@ -105,30 +105,30 @@ class Evidence(EvidenceBase, TimestampedModel):
 # AS1851 rules models
 class AS1851RuleBase(BaseModel):
     rule_code: str = Field(
-        description="Unique identifier for the AS1851 rule",
-        example="AS1851-2012-FE-01",
         min_length=1, 
-        max_length=50
+        max_length=50,
+        description="Unique identifier for the AS1851 rule",
+        examples=["AS1851-2012-FE-01"]
     )
     rule_name: str = Field(
-        description="Human-readable name for the compliance rule",
-        example="Fire Extinguisher Monthly Inspection",
         min_length=1, 
-        max_length=255
+        max_length=255,
+        description="Human-readable name for the compliance rule",
+        examples=["Fire Extinguisher Monthly Inspection"]
     )
     description: Optional[str] = Field(
         None,
         description="Detailed description of what this rule checks and validates",
-        example="Validates that fire extinguishers are inspected monthly according to AS1851-2012 standards"
+        examples=["Validates that fire extinguishers are inspected monthly according to AS1851-2012 standards"]
     )
     rule_schema: Dict[str, Any] = Field(
         description="JSON schema defining the validation rules and required fields for compliance",
-        example={
+        examples=[{
             "required_fields": ["pressure_reading", "pin_status", "visual_condition"],
             "validation_rules": {
                 "pressure_reading": {"type": "number", "min": 180, "max": 220}
             }
-        }
+        }]
     )
     is_active: bool = Field(
         True,
