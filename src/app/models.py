@@ -6,7 +6,8 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+import semver
+from pydantic import BaseModel, Field, validator
 
 # Base models
 class TimestampedModel(BaseModel):
@@ -102,7 +103,7 @@ class Evidence(EvidenceBase, TimestampedModel):
     session_id: UUID
     checksum: Optional[str] = None
 
-# AS1851 rules models
+# AS1851 rules models - Versioned and immutable
 class AS1851RuleBase(BaseModel):
     rule_code: str = Field(
         min_length=1, 
@@ -130,18 +131,37 @@ class AS1851RuleBase(BaseModel):
             }
         }]
     )
-    is_active: bool = Field(
-        True,
-        description="Whether this rule is currently active and available for use in classifications"
-    )
 
 class AS1851RuleCreate(AS1851RuleBase):
-    pass
+    version: str = Field(
+        description="Semantic version for this rule (e.g., '1.2.0')",
+        examples=["1.0.0", "2.1.0"]
+    )
+    
+    @validator('version')
+    def validate_version(cls, v):
+        try:
+            semver.VersionInfo.parse(v)
+        except ValueError:
+            raise ValueError("Version string must be a valid semantic version (e.g., '1.2.3')")
+        return v
 
-class AS1851Rule(AS1851RuleBase, TimestampedModel):
+class AS1851Rule(AS1851RuleBase):
     id: UUID = Field(
         ...,
         description="Unique identifier for the AS1851 rule record"
+    )
+    version: str = Field(
+        ...,
+        description="Semantic version for this rule"
+    )
+    is_active: bool = Field(
+        True,
+        description="Whether this rule version is currently active"
+    )
+    created_at: datetime = Field(
+        ...,
+        description="When this rule version was created"
     )
 
 # Classification models

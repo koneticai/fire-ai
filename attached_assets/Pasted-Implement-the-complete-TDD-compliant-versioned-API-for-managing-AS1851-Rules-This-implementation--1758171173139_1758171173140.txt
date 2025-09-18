@@ -1,0 +1,174 @@
+Implement the complete, TDD-compliant, versioned API for managing AS1851 Rules. This implementation must prevent in-place updates to preserve audit history, treating each rule version as an immutable record.
+
+Step 1: Update Dependencies
+Modify the [tool.poetry.dependencies] section of your pyproject.toml file to include the semver library for version validation:
+Ini, TOML
+# pyproject.toml
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.110.0"
+uvicorn = "^0.27.1"
+sqlalchemy = "^2.0.28"
+alembic = "^1.13.1"
+psycopg2-binary = "^2.9.9"
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+pydantic-settings = "^2.2.1"
+python-multipart = "^0.0.9"
+semver = "^3.0.2" # Add this line
+Run poetry lock && poetry install to update the environment.
+Step 2: Create the Database Model and Migration
+Create a new file at src/app/models/rules.py and add the following SQLAlchemy model:
+Python
+# src/app/models/rules.py
+import uuid
+from sqlalchemy import (Column, String, Text, Boolean, DateTime,
+                        UniqueConstraint, func)
+from sqlalchemy.dialects.postgresql import UUID, JSONB
+from ..database.core import Base
+
+class AS1851Rule(Base):
+    __tablename__ = 'as1851_rules'
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    rule_code = Column(String, nullable=False, index=True)
+    version = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    details = Column(JSONB, nullable=False) # Stores the rule logic as JSON
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('rule_code', 'version', name='_rule_code_version_uc'),
+    )
+Update src/app/models/__init__.py to include the new model:
+Python
+# src/app/models/__init__.py
+from .revocation import TokenRevocationList
+from .rules import AS1851Rule # Add this import
+Generate the migration script: poetry run alembic revision --autogenerate -m "Add as1851_rules table"
+Apply the migration: poetry run alembic upgrade head
+Step 3: Define Pydantic Schemas
+Create a new file at src/app/schemas/rule.py for data validation:
+Python
+# src/app/schemas/rule.py
+import uuid
+import semver
+from datetime import datetime
+from pydantic import BaseModel, validator, Field
+
+class RuleBase(BaseModel):
+    rule_code: str = Field(..., example="A1.2b")
+    description: str
+    details: dict
+
+class RuleCreate(RuleBase):
+    version: str = Field(..., example="1.2.0")
+
+    @validator('version')
+    def validate_version(cls, v):
+        try:
+            semver.VersionInfo.parse(v)
+        except ValueError:
+            raise ValueError("Version string must be a valid semantic version (e.g., '1.2.3')")
+        return v
+
+class Rule(RuleBase):
+    id: uuid.UUID
+    version: str
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+Step 4: Implement the API Router
+Create a new file src/app/routers/rules.py with the version-aware endpoints:
+Python
+# src/app/routers/rules.py
+import uuid
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from sqlalchemy import desc
+from .. import schemas
+from ..database.core import get_db
+from ..dependencies import get_current_active_user
+from ..models.rules import AS1851Rule
+
+router = APIRouter(prefix="/v1/rules", tags=["Rules"])
+
+@router.post("/", response_model=schemas.Rule, status_code=status.HTTP_201_CREATED)
+def create_rule(
+    rule: schemas.RuleCreate,
+    db: Session = Depends(get_db),
+    current_user: schemas.TokenData = Depends(get_current_active_user)
+):
+    """Creates a new, versioned AS1851 rule. Rejects duplicates."""
+    existing_rule = db.query(AS1851Rule).filter(
+        AS1851Rule.rule_code == rule.rule_code,
+        AS1851Rule.version == rule.version
+    ).first()
+    if existing_rule:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Rule {rule.rule_code} version {rule.version} already exists."
+        )
+    db_rule = AS1851Rule(**rule.model_dump())
+    db.add(db_rule)
+    db.commit()
+    db.refresh(db_rule)
+    return db_rule
+
+@router.get("/", response_model=List[schemas.Rule])
+def get_all_active_rules(
+    db: Session = Depends(get_db),
+    current_user: schemas.TokenData = Depends(get_current_active_user)
+):
+    """Lists all active AS1851 rules."""
+    return db.query(AS1851Rule).filter(AS1851Rule.is_active == True).all()
+
+@router.get("/{rule_code}", response_model=schemas.Rule)
+def get_latest_active_rule_by_code(
+    rule_code: str,
+    db: Session = Depends(get_db),
+    current_user: schemas.TokenData = Depends(get_current_active_user)
+):
+    """Gets the latest active version of a rule by its code."""
+    rule = db.query(AS1851Rule).filter(
+        AS1851Rule.rule_code == rule_code,
+        AS1851Rule.is_active == True
+    ).order_by(desc(AS1851Rule.version)).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail=f"Active rule with code {rule_code} not found.")
+    return rule
+
+@router.put("/id/{rule_id}/deactivate", response_model=schemas.Rule)
+def deactivate_rule(
+    rule_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: schemas.TokenData = Depends(get_current_active_user)
+):
+    """Deactivates a specific rule version. This is the only way to 'update' a rule."""
+    db_rule = db.query(AS1851Rule).filter(AS1851Rule.id == rule_id).first()
+    if not db_rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    db_rule.is_active = False
+    db.commit()
+    db.refresh(db_rule)
+    return db_rule
+Step 5: Integrate the Router
+Modify src/app/main.py to include the new rules router:
+Python
+# src/app/main.py
+from fastapi import FastAPI
+from .routers import auth, rules # Add rules import
+
+app = FastAPI(title="FireMode Compliance Platform")
+
+app.include_router(auth.router)
+app.include_router(rules.router) # Add this line
+
+@app.get("/")
+def read_root():
+    return {"status": "ok"}

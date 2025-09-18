@@ -29,8 +29,8 @@ async def list_rules(
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT id, rule_code, rule_name, description, rule_schema, 
-                       is_active, created_at, updated_at
+                SELECT id, rule_code, version, rule_name, description, rule_schema, 
+                       is_active, created_at
                 FROM as1851_rules 
                 WHERE is_active = true
                 ORDER BY rule_code
@@ -43,12 +43,12 @@ async def list_rules(
                 rule = AS1851Rule(
                     id=row[0],
                     rule_code=row[1],
-                    rule_name=row[2],
-                    description=row[3],
-                    rule_schema=row[4],
-                    is_active=row[5],
-                    created_at=row[6],
-                    updated_at=row[7]
+                    rule_name=row[3],
+                    description=row[4],
+                    rule_schema=row[5],
+                    version=row[2] or "1.0.0",  # Use database version or default
+                    is_active=row[6],
+                    created_at=row[7]
                 )
                 rules.append(rule)
         
@@ -74,19 +74,20 @@ async def create_rule(
         with conn.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO as1851_rules 
-                (rule_code, rule_name, description, rule_schema, is_active)
-                VALUES (%s, %s, %s, %s, %s)
-                RETURNING id, created_at, updated_at
+                (rule_code, version, rule_name, description, rule_schema, is_active)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id, created_at
             """, (
                 rule_data.rule_code,
+                "1.0.0",  # Default version for backward compatibility
                 rule_data.rule_name,
                 rule_data.description,
                 json.dumps(rule_data.rule_schema),
-                rule_data.is_active
+                True  # Default active state
             ))
             
             result = cursor.fetchone()
-            rule_id, created_at, updated_at = result
+            rule_id, created_at = result
             
             conn.commit()
         
@@ -98,9 +99,9 @@ async def create_rule(
             rule_name=rule_data.rule_name,
             description=rule_data.description,
             rule_schema=rule_data.rule_schema,
-            is_active=rule_data.is_active,
-            created_at=created_at,
-            updated_at=updated_at
+            version="1.0.0",  # Default version for backward compatibility
+            is_active=True,  # Default active state
+            created_at=created_at
         )
         
     except psycopg2.IntegrityError as e:

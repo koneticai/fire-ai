@@ -51,16 +51,17 @@ CREATE TABLE IF NOT EXISTS evidence (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- AS1851 rules table with flexible rule schema
+-- AS1851 rules table with versioning support (immutable records)
 CREATE TABLE IF NOT EXISTS as1851_rules (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    rule_code VARCHAR(50) UNIQUE NOT NULL,
+    rule_code VARCHAR(50) NOT NULL,
+    version VARCHAR(50) NOT NULL,
     rule_name VARCHAR(255) NOT NULL,
     description TEXT,
     rule_schema JSONB NOT NULL,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    UNIQUE(rule_code, version)
 );
 
 -- Token revocation list for JWT security
