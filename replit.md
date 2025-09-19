@@ -14,15 +14,18 @@ Preferred communication style: Simple, everyday language.
 The application implements a dual-runtime architecture to meet performance requirements:
 - **Python/FastAPI**: Main application entrypoint handling standard CRUD operations, authentication, and business logic
 - **Go Service**: Compiled binary running as subprocess to handle performance-critical endpoints (`/v1/evidence` and `/v1/tests/sessions/{session_id}/results`) with p95 latency requirements under 300ms
+- **Process Manager**: Robust process management with health monitoring, automatic restarts, and graceful shutdown handling
 
 ### API Architecture
 - **RESTful Design**: Standard REST endpoints with consistent response patterns
-- **Router-based Organization**: Modular endpoint organization using FastAPI routers for tests, rules, and other domains
-- **Reverse Proxy Pattern**: Python application proxies performance-critical requests to the Go service
+- **Router-based Organization**: Modular endpoint organization using FastAPI routers for tests, rules, evidence, and test results
+- **Secure Proxy Layer**: Python application proxies performance-critical requests to the Go service with internal JWT authentication
 - **CRDT Support**: Conflict-free Replicated Data Types using automerge library for distributed session data
 
 ### Authentication & Security
 - **JWT-based Authentication**: Bearer token authentication with configurable expiration
+- **Token Revocation List (RTL)**: Database-backed token revocation system for enhanced JWT security
+- **Internal JWT Authentication**: Secure inter-service communication between Python and Go services using dedicated JWT tokens
 - **PII Encryption**: Fernet symmetric encryption for sensitive user data (full names) stored as BYTEA in database
 - **Environment-based Configuration**: Security keys and database credentials managed through environment variables
 
@@ -40,14 +43,29 @@ The application implements a dual-runtime architecture to meet performance requi
 ```
 src/app/              # Python FastAPI application
 ├── database/         # Schema and initialization
+├── models/           # Pydantic data models
+│   └── rtl.py        # Token Revocation List model
 ├── routers/          # API endpoint modules
-├── models.py         # Pydantic data models
+│   ├── auth.py       # Authentication endpoints
+│   ├── classify.py   # Fault classification (proxied to Go)
+│   ├── evidence.py   # Evidence submission endpoints
+│   ├── test_results.py # Test results endpoints
+│   ├── tests.py      # Test session management
+│   └── rules.py      # AS1851 rules management
 ├── dependencies.py   # Authentication and DB dependencies
+├── internal_jwt.py   # Internal JWT token management
+├── process_manager.py # Go service process management
+├── proxy.py          # Go service communication layer
 ├── security.py       # PII encryption utilities
 └── main.py           # Application entry point
 
 src/go_service/       # Go performance service
-└── main.go           # HTTP service for critical endpoints
+└── main.go           # HTTP service for critical endpoints with JWT auth
+
+tests/                # Test suite
+├── test_rtl.py       # Token Revocation List tests
+├── test_internal_jwt.py # JWT functionality tests
+└── conftest.py       # Test configuration
 ```
 
 ## External Dependencies

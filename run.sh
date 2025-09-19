@@ -8,6 +8,12 @@ echo "Starting FireMode Compliance Platform..."
 # Set environment variables for production
 export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
 
+# Generate internal JWT secret if not set
+if [ -z "$INTERNAL_JWT_SECRET_KEY" ]; then
+    export INTERNAL_JWT_SECRET_KEY="$(openssl rand -hex 32)"
+    echo "Generated internal JWT secret key for inter-service communication"
+fi
+
 # Initialize the database if needed
 echo "Initializing database..."
 python src/app/database/init.py
