@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 
 from ..models import FaultDataInput, ClassificationResult, TokenData
 from ..dependencies import get_current_active_user
+from ..internal_jwt import get_internal_jwt_token
 
 router = APIRouter(tags=["Classification"])
 
@@ -41,14 +42,13 @@ async def create_classification(
         # Prepare request body
         body = fault_data.model_dump_json()
         
-        # Prepare headers for Go service
-        headers = dict(request.headers)
-        
-        # Add authenticated user ID header for Go service
-        # Remove any client-supplied x-user-id to prevent spoofing
-        headers.pop("x-user-id", None)
-        headers.pop("X-User-ID", None)
-        headers["X-User-ID"] = str(current_user.user_id)
+        # Prepare headers for Go service with internal JWT authentication
+        headers = {
+            "Content-Type": "application/json",
+            "X-Internal-Authorization": get_internal_jwt_token(str(current_user.user_id)),
+            "X-User-ID": str(current_user.user_id),
+            "User-Agent": request.headers.get("user-agent", "FastAPI-Proxy")
+        }
         
         # Add client IP forwarding
         client_ip = request.client.host if request.client else "unknown"

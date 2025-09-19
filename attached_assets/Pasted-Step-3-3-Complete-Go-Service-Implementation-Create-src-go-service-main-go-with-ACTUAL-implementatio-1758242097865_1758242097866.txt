@@ -1,0 +1,298 @@
+Step 3.3: Complete Go Service Implementation
+Create src/go_service/main.go with ACTUAL implementations:
+
+Go
+package main
+
+import (
+    "crypto/sha256"
+    "encoding/hex"
+    "encoding/json"
+    "fmt"
+    "io"
+    "log"
+    "net/http"
+    "os"
+    "time"
+    
+    "[github.com/golang-jwt/jwt/v5](https://github.com/golang-jwt/jwt/v5)"
+    "[github.com/gorilla/mux](https://github.com/gorilla/mux)"
+    "[github.com/jackc/pgx/v5](https://github.com/jackc/pgx/v5)"
+)
+
+type CRDTPayload struct {
+    SessionID   string                 `json:"session_id"`
+    Changes     []map[string]interface{} `json:"changes"`
+    VectorClock map[string]int         `json:"vector_clock"`
+    IdempotencyKey string              `json:"idempotency_key"`
+}
+
+func validateInternalJWT(next http.HandlerFunc) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        tokenStr := r.Header.Get("X-Internal-Authorization")
+        if tokenStr == "" {
+            http.Error(w, "Unauthorized", http.StatusUnauthorized)
+            return
+        }
+        
+        token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+            return []byte(os.Getenv("INTERNAL_JWT_SECRET_KEY")), nil
+        })
+        
+        if err != nil || !token.Valid {
+            http.Error(w, "Invalid token", http.StatusUnauthorized)
+            return
+        }
+        
+        next(w, r)
+    }
+}
+
+func handleEvidence(w http.ResponseWriter, r *http.Request) {
+    // Parse multipart form
+    err := r.ParseMultipartForm(10 << 20) // 10MB max
+    if err != nil {
+        http.Error(w, "Failed to parse form", http.StatusBadRequest)
+        return
+    }
+    
+    // Get file and hash
+    file, _, err := r.FormFile("file")
+    if err != nil {
+        http.Error(w, "File required", http.StatusBadRequest)
+        return
+    }
+    defer file.Close()
+    
+    providedHash := r.FormValue("sha256_hash")
+    if providedHash == "" {
+        http.Error(w, "SHA256 hash required", http.StatusBadRequest)
+        return
+    }
+    
+    // Calculate actual hash
+    hasher := sha256.New()
+    if _, err := io.Copy(hasher, file); err != nil {
+        http.Error(w, "Failed to read file", http.StatusInternalServerError)
+        return
+    }
+    
+    actualHash := hex.EncodeToString(hasher.Sum(nil))
+    if actualHash != providedHash {
+        http.Error(w, "Hash mismatch", http.StatusBadRequest)
+        return
+    }
+    
+    // Store metadata in database
+    // TODO: Implement database storage
+    
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]string{
+        "evidence_id": "generated-uuid",
+        "hash": actualHash,
+        "status": "verified",
+    })
+}
+
+func handleCRDTResults(w http.ResponseWriter, r *http.Request) {
+    vars := mux.Vars(r)
+    sessionID := vars["session_id"]
+    
+    var payload CRDTPayload
+    if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+        http.Error(w, "Invalid payload", http.StatusBadRequest)
+        return
+    }
+    
+    // Validate idempotency
+    if payload.IdempotencyKey == "" {
+        http.Error(w, "Idempotency key required", http.StatusBadRequest)
+        return
+    }
+    
+    // TODO: Check idempotency_keys table
+    // TODO: Process CRDT changes with vector clock
+    // TODO: Store results
+    
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]interface{}{
+        "session_id": sessionID,
+        "status": "processed",
+        "vector_clock": payload.VectorClock,
+    })
+}
+
+func main() {
+    r := mux.NewRouter()
+    
+    r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+        w.Write([]byte("OK"))
+    }).Methods("GET")
+    
+    r.HandleFunc("/v1/evidence", validateInternalJWT(handleEvidence)).Methods("POST")
+    r.HandleFunc("/v1/tests/sessions/{session_id}/results", 
+                 validateInternalJWT(handleCRDTResults)).Methods("POST")
+    
+    log.Println("Go service starting on :9090")
+    log.Fatal(http.ListenAndServe(":9090", r))
+}
+Step 3.4: Python FastAPI Refactoring
+Update src/app/dependencies.py for RTL check:
+
+Python
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer
+from jose import JWTError, jwt, ExpiredSignatureError
+from sqlalchemy.orm import Session
+from datetime import datetime
+from .database.core import get_db
+from .models.rtl import TokenRevocationList
+from .config import settings
+
+security = HTTPBearer()
+
+async def get_current_active_user(
+    token: HTTPBearer = Depends(security),
+    db: Session = Depends(get_db)
+):
+    try:
+        payload = jwt.decode(
+            token.credentials,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM]
+        )
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired"
+        )
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token"
+        )
+    
+    # Check RTL
+    jti = payload.get("jti")
+    if jti:
+        revoked = db.query(TokenRevocationList).filter(
+            TokenRevocationList.jti == jti
+        ).first()
+        if revoked:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has been revoked"
+            )
+    
+    return payload
+Create src/app/proxy.py for Go service proxying:
+
+Python
+import httpx
+from fastapi import Request, Response
+from jose import jwt
+from datetime import datetime, timedelta
+from .config import settings
+
+def create_internal_token():
+    expire = datetime.utcnow() + timedelta(minutes=5)
+    return jwt.encode(
+        {"exp": expire, "type": "internal"},
+        settings.INTERNAL_JWT_SECRET_KEY,
+        algorithm="HS256"
+    )
+
+async def proxy_to_go(request: Request, path: str):
+    internal_token = create_internal_token()
+    
+    async with httpx.AsyncClient() as client:
+        # Forward request to Go service
+        response = await client.request(
+            method=request.method,
+            url=f"http://localhost:9090{path}",
+            headers={
+                **dict(request.headers),
+                "X-Internal-Authorization": internal_token
+            },
+            content=await request.body()
+        )
+    
+    return Response(
+        content=response.content,
+        status_code=response.status_code,
+        headers=dict(response.headers)
+    )
+Step 3.5: Robust Process Management
+Create src/app/supervisor.py:
+
+Python
+import subprocess
+import signal
+import sys
+import time
+import os
+import threading
+
+class ProcessManager:
+    def __init__(self):
+        self.processes = {}
+        self.running = True
+        
+    def build_go_service(self):
+        print("Building Go service...")
+        result = subprocess.run(
+            ["go", "build", "-o", "bin/go_service", "./src/go_service"],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0:
+            print(f"Go build failed: {result.stderr}")
+            sys.exit(1)
+        print("Go service built successfully")
+    
+    def start_service(self, name, command):
+        def run():
+            while self.running:
+                print(f"Starting {name}...")
+                proc = subprocess.Popen(command)
+                self.processes[name] = proc
+                proc.wait()
+                if self.running:
+                    print(f"{name} crashed, restarting in 2 seconds...")
+                    time.sleep(2)
+        
+        thread = threading.Thread(target=run, daemon=True)
+        thread.start()
+    
+    def signal_handler(self, signum, frame):
+        print("\nShutting down services...")
+        self.running = False
+        for name, proc in self.processes.items():
+            if proc.poll() is None:
+                proc.terminate()
+        sys.exit(0)
+    
+    def run(self):
+        signal.signal(signal.SIGINT, self.signal_handler)
+        signal.signal(signal.SIGTERM, self.signal_handler)
+        
+        self.build_go_service()
+        
+        self.start_service("go_service", ["./bin/go_service"])
+        time.sleep(2)  # Let Go service start
+        
+        self.start_service("python_service", [
+            "poetry", "run", "uvicorn",
+            "src.app.main:app",
+            "--host", "0.0.0.0",
+            "--port", "8080",
+            "--reload"
+        ])
+        
+        # Keep main thread alive
+        while self.running:
+            time.sleep(1)
+
+if __name__ == "__main__":
+    ProcessManager().run()

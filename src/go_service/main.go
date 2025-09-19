@@ -79,6 +79,21 @@ type IdempotencyCheck struct {
         ExpiresAt    time.Time `json:"expires_at"`
 }
 
+// EvidenceRequest represents an evidence submission request
+type EvidenceRequest struct {
+        SessionID     string                 `json:"session_id"`
+        EvidenceType  string                 `json:"evidence_type"`
+        FilePath      string                 `json:"file_path"`
+        Data          string                 `json:"data"`
+        Metadata      map[string]interface{} `json:"metadata"`
+}
+
+// TestResultRequest represents a test result submission request
+type TestResultRequest struct {
+        SessionID string                 `json:"session_id"`
+        Results   map[string]interface{} `json:"results"`
+}
+
 // Database connection
 var db *pgx.Conn
 
@@ -121,15 +136,6 @@ func validateInternalJWT(next http.HandlerFunc) http.HandlerFunc {
                 
                 next(w, r)
         }
-}
-
-        // Test the connection
-        if err := db.Ping(context.Background()); err != nil {
-                return fmt.Errorf("failed to ping database: %v", err)
-        }
-
-        log.Println("Database connection established")
-        return nil
 }
 
 // calculateSHA256 calculates SHA-256 hash of the input data

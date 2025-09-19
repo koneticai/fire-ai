@@ -19,6 +19,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 # Import dependencies needed for authentication
 from .dependencies import get_current_active_user
 from .models import TokenData
+from .internal_jwt import get_internal_jwt_token
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -208,11 +209,13 @@ async def proxy_evidence(request: Request, current_user: TokenData = Depends(get
         body = await request.body()
         headers = dict(request.headers)
         
-        # Add authenticated user ID header for Go service
-        # Remove any client-supplied x-user-id to prevent spoofing
-        headers.pop("x-user-id", None)
-        headers.pop("X-User-ID", None)
-        headers["X-User-ID"] = str(current_user.user_id)
+        # Add authenticated headers for Go service with internal JWT
+        headers = {
+            "Content-Type": headers.get("content-type", "application/json"),
+            "X-Internal-Authorization": get_internal_jwt_token(str(current_user.user_id)),
+            "X-User-ID": str(current_user.user_id),
+            "User-Agent": headers.get("user-agent", "FastAPI-Proxy")
+        }
         
         response = await go_service_client.post(
             "/v1/evidence",
@@ -250,11 +253,13 @@ async def proxy_test_results(session_id: str, request: Request, current_user: To
         body = await request.body()
         headers = dict(request.headers)
         
-        # Add authenticated user ID header for Go service
-        # Remove any client-supplied x-user-id to prevent spoofing
-        headers.pop("x-user-id", None)
-        headers.pop("X-User-ID", None)
-        headers["X-User-ID"] = str(current_user.user_id)
+        # Add authenticated headers for Go service with internal JWT
+        headers = {
+            "Content-Type": headers.get("content-type", "application/json"),
+            "X-Internal-Authorization": get_internal_jwt_token(str(current_user.user_id)),
+            "X-User-ID": str(current_user.user_id),
+            "User-Agent": headers.get("user-agent", "FastAPI-Proxy")
+        }
         
         response = await go_service_client.post(
             f"/v1/tests/sessions/{session_id}/results",
@@ -282,10 +287,12 @@ async def proxy_test_results(session_id: str, request: Request, current_user: To
         raise HTTPException(status_code=503, detail="Performance service error")
 
 # Import and include routers
-from .routers import tests, rules, auth, rules_versioned, classify, users
+from .routers import tests, rules, auth, rules_versioned, classify, users, evidence, test_results
 
 app.include_router(auth.router, prefix="/v1/auth")
 app.include_router(tests.router, prefix="/v1/tests")
+app.include_router(evidence.router)  # Evidence router has its own prefix
+app.include_router(test_results.router)  # Test results router has its own prefix
 app.include_router(rules.router, prefix="/v1/rules")
 app.include_router(rules_versioned.router, prefix="/v2/rules")
 app.include_router(classify.router, prefix="/v1/classify")
