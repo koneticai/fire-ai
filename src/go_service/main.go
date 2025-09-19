@@ -17,22 +17,29 @@ import (
         "github.com/jackc/pgx/v5"
         "github.com/google/uuid"
         "github.com/Masterminds/semver/v3"
+        "github.com/golang-jwt/jwt/v5"
 )
 
-// EvidenceRequest represents the structure for evidence submission
-type EvidenceRequest struct {
-        SessionID    string                 `json:"session_id"`
-        EvidenceType string                 `json:"evidence_type"`
-        FilePath     string                 `json:"file_path,omitempty"`
-        Metadata     map[string]interface{} `json:"metadata,omitempty"`
-        Data         string                 `json:"data,omitempty"`
+// CRDTPayload represents the structure for CRDT-based test results
+type CRDTPayload struct {
+        SessionID      string                   `json:"session_id"`
+        Changes        []map[string]interface{} `json:"changes"`
+        VectorClock    map[string]int          `json:"vector_clock"`
+        IdempotencyKey string                  `json:"idempotency_key"`
 }
 
-// TestResultRequest represents the structure for test results submission
-type TestResultRequest struct {
-        SessionID string                 `json:"session_id"`
-        Results   map[string]interface{} `json:"results"`
-        Timestamp time.Time              `json:"timestamp"`
+// EvidenceResponse represents the response for evidence submission
+type EvidenceResponse struct {
+        EvidenceID string `json:"evidence_id"`
+        Hash       string `json:"hash"`
+        Status     string `json:"status"`
+}
+
+// CRDTResponse represents the response for CRDT results
+type CRDTResponse struct {
+        SessionID   string         `json:"session_id"`
+        Status      string         `json:"status"`
+        VectorClock map[string]int `json:"vector_clock"`
 }
 
 // FaultDataInput represents the structure for fault classification input
@@ -87,6 +94,34 @@ func initDB() error {
         if err != nil {
                 return fmt.Errorf("failed to connect to database: %v", err)
         }
+        return nil
+}
+
+// JWT validation middleware for internal service communication
+func validateInternalJWT(next http.HandlerFunc) http.HandlerFunc {
+        return func(w http.ResponseWriter, r *http.Request) {
+                tokenStr := r.Header.Get("X-Internal-Authorization")
+                if tokenStr == "" {
+                        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+                        return
+                }
+                
+                token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+                        // Validate signing method
+                        if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+                                return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+                        }
+                        return []byte(os.Getenv("INTERNAL_JWT_SECRET_KEY")), nil
+                })
+                
+                if err != nil || !token.Valid {
+                        http.Error(w, "Invalid token", http.StatusUnauthorized)
+                        return
+                }
+                
+                next(w, r)
+        }
+}
 
         // Test the connection
         if err := db.Ping(context.Background()); err != nil {
@@ -580,9 +615,9 @@ func main() {
         // Create router
         router := mux.NewRouter()
 
-        // Add routes
-        router.HandleFunc("/v1/evidence", evidenceHandler).Methods("POST")
-        router.HandleFunc("/v1/tests/sessions/{session_id}/results", testResultsHandler).Methods("POST")
+        // Add routes with JWT middleware for internal endpoints
+        router.HandleFunc("/v1/evidence", validateInternalJWT(evidenceHandler)).Methods("POST")
+        router.HandleFunc("/v1/tests/sessions/{session_id}/results", validateInternalJWT(testResultsHandler)).Methods("POST")
         router.HandleFunc("/v1/classify", classificationHandler).Methods("POST")
         router.HandleFunc("/health", healthHandler).Methods("GET")
 
