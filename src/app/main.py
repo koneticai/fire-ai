@@ -4,8 +4,6 @@ Main FastAPI application with hybrid Python/Go architecture
 """
 
 import os
-import subprocess
-import time
 import asyncio
 import logging
 from pathlib import Path
@@ -20,71 +18,38 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from .dependencies import get_current_active_user
 from .models import TokenData
 from .internal_jwt import get_internal_jwt_token
+from .process_manager import get_go_service_manager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global Go service process
-go_service_process = None
+# Global Go service client
 go_service_client = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager to start/stop Go service"""
-    global go_service_process, go_service_client
+    global go_service_client
+    
+    # Get the process manager
+    process_manager = get_go_service_manager()
     
     try:
-        # Build and start Go service
-        logger.info("Building Go service...")
-        go_service_dir = Path(__file__).parent.parent / "go_service"
-        
-        # Build the Go service
-        build_result = subprocess.run(
-            ["go", "build", "-o", "firemode-go-service", "main.go"],
-            cwd=go_service_dir,
-            capture_output=True,
-            text=True
-        )
-        
-        if build_result.returncode != 0:
-            logger.error(f"Go service build failed: {build_result.stderr}")
-            raise Exception("Failed to build Go service")
-        
-        logger.info("Starting Go service...")
-        # Start the Go service as a subprocess
-        go_service_process = subprocess.Popen(
-            ["./firemode-go-service"],
-            cwd=go_service_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-        
-        # Wait a moment for the service to start
-        await asyncio.sleep(2)
-        
-        # Check if the process is still running
-        if go_service_process.poll() is not None:
-            stdout, stderr = go_service_process.communicate()
-            logger.error(f"Go service failed to start. stdout: {stdout.decode()}, stderr: {stderr.decode()}")
-            raise Exception("Go service failed to start")
-        
-        # Create HTTP client for Go service
-        go_service_client = httpx.AsyncClient(base_url="http://localhost:9090")
-        
-        # Test connection to Go service
-        try:
-            response = await go_service_client.get("/health", timeout=5.0)
-            if response.status_code == 200:
-                logger.info("Go service started successfully")
-            else:
-                logger.warning(f"Go service health check returned {response.status_code}")
-        except Exception as e:
-            logger.warning(f"Go service health check failed: {e}")
-        
-        # Set Go service client for classification router
-        from .routers import classify
-        classify.set_go_service_client(go_service_client)
+        # Start Go service using process manager
+        logger.info("Starting Go service with process manager...")
+        if await process_manager.start():
+            logger.info("Go service started successfully")
+            
+            # Create HTTP client for Go service
+            go_service_client = httpx.AsyncClient(base_url="http://localhost:9090")
+            
+            # Set Go service client for classification router
+            from .routers import classify
+            classify.set_go_service_client(go_service_client)
+        else:
+            logger.error("Failed to start Go service with process manager")
+            # Continue without Go service for development
         
         yield
         
@@ -98,13 +63,9 @@ async def lifespan(app: FastAPI):
         if go_service_client:
             await go_service_client.aclose()
         
-        if go_service_process and go_service_process.poll() is None:
-            logger.info("Shutting down Go service...")
-            go_service_process.terminate()
-            try:
-                go_service_process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                go_service_process.kill()
+        # Stop Go service using process manager
+        logger.info("Shutting down Go service...")
+        await process_manager.stop()
 
 # Create FastAPI app
 app = FastAPI(
@@ -195,7 +156,21 @@ async def root():
 @app.get("/health", tags=["Health"])
 async def health_check():
     """Health check endpoint for the main application"""
-    return {"status": "ok", "service": "firemode-backend"}
+    process_manager = get_go_service_manager()
+    go_service_status = process_manager.get_status()
+    
+    return {
+        "status": "ok",
+        "service": "firemode-backend", 
+        "go_service": go_service_status
+    }
+
+# Go service status endpoint
+@app.get("/health/go-service", tags=["Health"])
+async def go_service_health():
+    """Detailed health check for the Go service"""
+    process_manager = get_go_service_manager()
+    return process_manager.get_status()
 
 # Reverse proxy endpoints for Go service
 @app.post("/v1/evidence", tags=["Evidence"], summary="Submit Evidence", description="High-performance evidence submission endpoint (proxied to Go service)")
