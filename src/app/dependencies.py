@@ -16,7 +16,10 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from .models import TokenData
 
 # Security configuration
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not JWT_SECRET_KEY:
+    raise RuntimeError("JWT_SECRET_KEY environment variable is required")
+
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
@@ -65,21 +68,32 @@ def verify_token(token: str) -> TokenData:
     """Verify JWT token and return token data"""
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
-        username: str = payload.get("sub") or ""
-        user_id: str = payload.get("user_id") or ""
-        jti: str = payload.get("jti") or ""
-        exp: int = payload.get("exp") or 0
+        username = payload.get("sub")
+        user_id = payload.get("user_id")
+        jti = payload.get("jti")
+        exp = payload.get("exp")
         
-        if username is None or user_id is None or jti is None:
+        # Require all critical claims to be present and non-empty
+        if not username or not user_id or not jti or not exp:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token",
+                detail="Invalid token - missing required claims",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Validate user_id is a valid UUID format
+        try:
+            user_uuid = UUID(user_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token - malformed user_id",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
         token_data = TokenData(
             username=username,
-            user_id=UUID(user_id),
+            user_id=user_uuid,
             jti=jti,
             exp=datetime.fromtimestamp(exp)
         )
@@ -168,37 +182,12 @@ async def get_current_active_user(
             exp=datetime.fromtimestamp(exp)
         )
         
-        # Functional RTL Check - query database for revoked tokens
-        conn = None
-        try:
-            conn = get_database_connection()
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    SELECT COUNT(*) 
-                    FROM token_revocation_list 
-                    WHERE token_jti = %s AND expires_at > CURRENT_TIMESTAMP
-                """, (token_data.jti,))
-                
-                result = cursor.fetchone()
-                revoked_count = result[0] if result else 0
-                if revoked_count > 0:
-                    conn.close()
-                    raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="Token has been revoked",
-                        headers={"WWW-Authenticate": "Bearer"},
-                    )
-            conn.close()
-        except HTTPException:
-            if conn:
-                conn.close()
-            raise
-        except Exception as e:
-            if conn:
-                conn.close()
+        # Critical RTL Check - query database for revoked tokens
+        if check_token_revocation(token_data.jti, get_database_connection()):
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Token validation failed"
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has been revoked",
+                headers={"WWW-Authenticate": "Bearer"},
             )
         
         # Return token payload if valid and not revoked
