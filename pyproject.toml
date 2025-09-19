@@ -1,20 +1,31 @@
-[project]
-name = "repl-nix-workspace"
+[tool.poetry]
+name = "firemode-compliance"
 version = "0.1.0"
-description = "Add your description here"
-requires-python = ">=3.11"
-dependencies = [
-    "automerge>=0.1.2",
-    "cryptography>=46.0.1",
-    "fastapi>=0.116.2",
-    "httpx>=0.28.1",
-    "locust>=2.40.5",
-    "opentelemetry-instrumentation-fastapi>=0.58b0",
-    "pandas>=2.3.2",
-    "psycopg2-binary>=2.9.10",
-    "pydantic>=2.11.9",
-    "pytest>=8.4.2",
-    "python-jose[cryptography]>=3.5.0",
-    "semver>=3.0.4",
-    "uvicorn>=0.35.0",
-]
+description = "FireMode Compliance Platform Backend"
+authors = ["FireMode Team"]
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "0.116.2"
+uvicorn = "0.35.0"
+pydantic = "2.11.9"
+python-jose = {extras = ["cryptography"], version = "3.5.0"}
+cryptography = "46.0.1"
+httpx = "0.27.0"
+sqlalchemy = "2.0.31"
+psycopg2-binary = "2.9.10"
+semver = "3.0.2"
+alembic = "1.13.2"
+pydantic-settings = "2.3.4"
+automerge = "^0.1.2"
+pandas = "^2.3.2"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2.2"
+pytest-asyncio = "^0.21.0"
+locust = "2.28.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
