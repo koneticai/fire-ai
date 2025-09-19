@@ -41,14 +41,23 @@ def get_database_connection():
         )
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Create JWT access token"""
+    """Create JWT access token with jti for revocation tracking"""
+    import uuid
+    
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS)
     
-    to_encode.update({"exp": expire})
+    # Add JWT ID for revocation tracking
+    jti = str(uuid.uuid4())
+    to_encode.update({
+        "exp": expire,
+        "jti": jti,
+        "iat": datetime.utcnow()
+    })
+    
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
     return encoded_jwt
 

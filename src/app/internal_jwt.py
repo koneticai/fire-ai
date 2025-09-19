@@ -43,12 +43,17 @@ class InternalJWTManager:
         Returns:
             JWT token string
         """
+        import uuid
+        
         now = datetime.utcnow()
+        jti = str(uuid.uuid4())  # JWT ID for revocation tracking
+        
         payload = {
             "iss": service_name,  # Issuer
             "aud": "go-service",  # Audience
             "iat": int(now.timestamp()),  # Issued at
             "exp": int((now + timedelta(minutes=self.expiration_minutes)).timestamp()),  # Expiry
+            "jti": jti,  # JWT ID for revocation
             "service": service_name,
             "purpose": "internal_communication"
         }
@@ -60,7 +65,7 @@ class InternalJWTManager:
     
     def validate_token(self, token: str) -> dict:
         """
-        Validate an internal JWT token.
+        Validate an internal JWT token with proper audience and issuer checks.
         
         Args:
             token: JWT token string
@@ -71,7 +76,13 @@ class InternalJWTManager:
         Raises:
             jwt.InvalidTokenError: If token is invalid
         """
-        return jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+        return jwt.decode(
+            token, 
+            self.secret_key, 
+            algorithms=[self.algorithm],
+            audience="go-service",
+            issuer="fastapi"
+        )
     
     def is_token_valid(self, token: str) -> bool:
         """
