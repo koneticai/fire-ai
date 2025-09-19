@@ -1,0 +1,54 @@
+One-Shot Amendment Prompt: FireMode Phase 1 Production Hardening (v1.3)
+
+1. Primary Objective
+Your mission is to apply the final production-hardening fixes to the FireMode backend. This involves resolving critical performance and data integrity issues in the Go service, implementing mandated observability, and empirically validating the platform's performance against its TDD non-functional requirements. This is the final gate before Phase 2 can begin.
+
+2. Core Architectural Mandates (Reinforced)
+- **Performance Under Load**: The Go service must not only be logically correct but also architecturally sound, using connection pools to manage database resources efficiently.
+- **Data Integrity**: The CRDT implementation must move from a structural placeholder to a functional implementation that can correctly merge concurrent changes.
+- **Observability**: The system must adhere to the TDD's requirement for distributed tracing via OpenTelemetry.
+- **Empirical Validation**: All performance NFRs must be proven with a load test, not assumed.
+
+3. Step-by-Step Implementation Plan
+
+Step 3.1: Harden Go Service with Connection Pooling
+"Refactor the `src/go_service/main.go` file to replace the standard `sql.DB` connection with a `pgxpool.Pool`.
+1.  **Update Dependencies**: Run `cd src/go_service && go get github.com/jackc/pgx/v5/pgxpool && cd ../..`
+2.  **Refactor `main` function**: Initialize a `pgxpool.Pool` at startup and pass it to the HTTP handlers. Ensure the pool is closed gracefully on exit.
+3.  **Update Handlers**: Modify the `classifyHandler` and its database helpers to acquire connections from the pool for each request and release them afterward."
+
+Step 3.2: Implement CRDT Vector Clock Logic
+"In `src/go_service/main.go`, update the `handleCRDTResults` function. Replace the `// TODO:` comments with a functional vector clock merge algorithm. The logic must:
+1.  Deserialize the incoming vector clock from the payload.
+2.  Retrieve the current vector clock for the session from the database.
+3.  Perform a comparison to detect concurrent edits or conflicts.
+4.  Implement a 'last-write-wins' or similar deterministic conflict resolution strategy.
+5.  Merge the changes and update the database with the new document state and the merged vector clock."
+
+Step 3.3: Instrument Python App with OpenTelemetry
+"Update `src/app/main.py` to include OpenTelemetry for distributed tracing as mandated by the TDD.
+1.  **Add Dependency**: Run `poetry add opentelemetry-instrumentation-fastapi`.
+2.  **Instrument App**: Add the following snippet to `main.py`:
+    ```python
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+    # After the app = FastAPI() line
+    FastAPIInstrumentor.instrument_app(app)
+    ```"
+
+Step 3.4: Implement and Run Performance Load Test
+"Create the Locust load test to validate the p95 < 300ms NFR.
+1.  **Create Test File**: Create `tests/load/locustfile.py`.
+2.  **Populate Script**: Add the Locust `HttpUser` class that targets the proxied `POST /v1/classify` endpoint. The script must set a valid JWT in the headers and send a valid classification payload.
+3.  **Configure Runner**: Update the `.replit` file to include the TDD-mandated test command:
+    ```ini
+    [commands]
+    test_load = "poetry run locust -f tests/load/locustfile.py --headless -u 500 -r 10 --run-time 2m"
+    ```
+4.  **Execute**: Instruct the developer to run the `test_load` command and confirm the p95 latency is below 300ms from the output statistics."
+
+Step 3.5: Harden the Process Supervisor
+"Refactor `src/app/supervisor.py` to be more robust and align with FastAPI's async nature.
+1.  **Convert to Asyncio**: Change the `run` method and its helpers to use `asyncio.create_subprocess_exec` instead of `subprocess.Popen` and `threading`.
+2.  **Implement Graceful Shutdown**: Ensure the `signal_handler` properly awaits the termination of child processes using `proc.terminate()` and `await proc.wait()`.
+3.  **Add Exponential Backoff**: In the restart loop, implement a simple exponential backoff delay (e.g., `delay = min(60, 2 ** restart_attempts)`) to prevent rapid crash loops from overwhelming the system."
