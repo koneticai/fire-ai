@@ -182,15 +182,19 @@ async def proxy_evidence(request: Request, current_user: TokenData = Depends(get
     try:
         # Forward the request to Go service
         body = await request.body()
-        headers = dict(request.headers)
+        original_headers = dict(request.headers)
         
         # Add authenticated headers for Go service with internal JWT
         headers = {
-            "Content-Type": headers.get("content-type", "application/json"),
+            "Content-Type": original_headers.get("content-type", "application/json"),
             "X-Internal-Authorization": get_internal_jwt_token(str(current_user.user_id)),
             "X-User-ID": str(current_user.user_id),
-            "User-Agent": headers.get("user-agent", "FastAPI-Proxy")
+            "User-Agent": original_headers.get("user-agent", "FastAPI-Proxy")
         }
+        
+        # Forward critical client headers
+        if "idempotency-key" in original_headers:
+            headers["Idempotency-Key"] = original_headers["idempotency-key"]
         
         response = await go_service_client.post(
             "/v1/evidence",
@@ -226,15 +230,19 @@ async def proxy_test_results(session_id: str, request: Request, current_user: To
     try:
         # Forward the request to Go service
         body = await request.body()
-        headers = dict(request.headers)
+        original_headers = dict(request.headers)
         
         # Add authenticated headers for Go service with internal JWT
         headers = {
-            "Content-Type": headers.get("content-type", "application/json"),
+            "Content-Type": original_headers.get("content-type", "application/json"),
             "X-Internal-Authorization": get_internal_jwt_token(str(current_user.user_id)),
             "X-User-ID": str(current_user.user_id),
-            "User-Agent": headers.get("user-agent", "FastAPI-Proxy")
+            "User-Agent": original_headers.get("user-agent", "FastAPI-Proxy")
         }
+        
+        # Forward critical client headers
+        if "idempotency-key" in original_headers:
+            headers["Idempotency-Key"] = original_headers["idempotency-key"]
         
         response = await go_service_client.post(
             f"/v1/tests/sessions/{session_id}/results",
