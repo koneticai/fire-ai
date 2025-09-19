@@ -1,0 +1,175 @@
+One-Shot Prompt: FireMode Phase 2, Checkpoint 1 - Core API Implementation (v2.2)
+
+1. Primary Objective
+Implement Task 2.1 from the TDD: All API endpoints strictly adhering to the v4.0 contract schemas. This includes the complete audit lifecycle, building management, and test session endpoints with proper async operations and contract testing.
+
+2. Prerequisites Validation
+Ensure Phase 1 is complete with:
+- Working hybrid Python/Go architecture
+- PostgreSQL with connection pooling
+- JWT authentication with RTL
+- OpenTelemetry instrumentation
+
+3. Implementation Steps
+
+Step 3.1: Async Database Setup
+Update src/app/database/core.py for async operations:
+```python
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.orm import declarative_base
+import os
+
+DATABASE_URL = os.getenv("DATABASE_URL").replace("postgresql://", "postgresql+asyncpg://")
+
+engine = create_async_engine(
+    DATABASE_URL,
+    pool_size=20,
+    max_overflow=40,
+    pool_pre_ping=True,
+    pool_recycle=3600
+)
+
+AsyncSessionLocal = async_sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False
+)
+
+Base = declarative_base()
+
+async def get_db():
+    async with AsyncSessionLocal() as session:
+        yield session
+Step 3.2: Complete Data Models
+Create src/app/models/buildings.py:
+pythonimport uuid
+from sqlalchemy import Column, String, DateTime, JSON, Boolean, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.sql import func
+from ..database.core import Base
+
+class Building(Base):
+    __tablename__ = 'buildings'
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    site_name = Column(String, nullable=False)
+    site_address = Column(String, nullable=False)
+    metadata = Column(JSON, default={})
+    is_active = Column(Boolean, default=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey('users.id'))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+Create src/app/models/test_sessions.py:
+pythonclass TestSession(Base):
+    __tablename__ = 'test_sessions'
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    building_id = Column(UUID(as_uuid=True), ForeignKey('buildings.id'))
+    status = Column(String, default='pending')  # pending, active, completed
+    vector_clock = Column(JSON, default={})
+    offline_bundle = Column(JSON)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+Step 3.3: API Implementation with Contract Compliance
+Create src/app/routers/buildings.py:
+pythonfrom fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from typing import Dict
+import uuid
+from ..database.core import get_db
+from ..models.buildings import Building
+from ..dependencies import get_current_active_user
+from ..schemas.building import BuildingCreate, BuildingRead
+
+router = APIRouter(prefix="/v1/buildings", tags=["buildings"])
+
+@router.post("/", response_model=BuildingRead, status_code=status.HTTP_201_CREATED)
+async def create_building(
+    building: BuildingCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: Dict = Depends(get_current_active_user)
+):
+    # Idempotency check
+    existing = await db.execute(
+        select(Building).where(
+            Building.site_name == building.site_name,
+            Building.site_address == building.site_address
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Building already exists")
+    
+    db_building = Building(
+        **building.dict(),
+        created_by=current_user["user_id"]
+    )
+    db.add(db_building)
+    await db.commit()
+    await db.refresh(db_building)
+    return db_building
+Step 3.4: Cursor-Based Pagination Implementation
+Create src/app/utils/pagination.py:
+pythonimport base64
+import json
+from typing import Optional, Dict, Any
+
+def encode_cursor(data: Dict[str, Any]) -> str:
+    """Encode pagination state as base64 cursor per TDD spec"""
+    cursor_data = {
+        "last_evaluated_id": str(data.get("id")),
+        "vector_clock": data.get("vector_clock", {})
+    }
+    return base64.b64encode(json.dumps(cursor_data).encode()).decode()
+
+def decode_cursor(cursor: Optional[str]) -> Dict[str, Any]:
+    """Decode base64 cursor to pagination state"""
+    if not cursor:
+        return {}
+    try:
+        decoded = base64.b64decode(cursor).decode()
+        return json.loads(decoded)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid cursor")
+Step 3.5: Contract Testing Setup
+Create tests/contracts/test_api_contracts.py:
+pythonimport pytest
+from httpx import AsyncClient
+from src.app.main import app
+
+@pytest.mark.asyncio
+async def test_building_creation_contract():
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        # Test matches TDD contract exactly
+        response = await client.post(
+            "/v1/buildings",
+            json={"site_name": "Test Site", "site_address": "123 Test St"},
+            headers={"Authorization": "Bearer valid-token"}
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert "building_id" in data
+        assert data["status"] == "active"
+
+@pytest.mark.asyncio
+async def test_standardized_error_format():
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        response = await client.get("/v1/nonexistent")
+        assert response.status_code == 404
+        error = response.json()
+        assert "transaction_id" in error
+        assert "error_code" in error
+        assert error["error_code"] == "FIRE-404"
+        assert "retryable" in error
+Step 3.6: Update Deployment Configuration
+Update .replit:
+tomlrun = "poetry run python src/app/supervisor.py"
+modules = ["python-3.11", "nodejs-20"]
+
+[deployment]
+run = ["sh", "-c", "poetry run alembic upgrade head && poetry run python src/app/supervisor.py"]
+deploymentTarget = "autoscale"
+
+[env]
+PYTHONPATH = "${REPL_HOME}"
+DATABASE_POOL_SIZE = "20"
+DATABASE_MAX_OVERFLOW = "40"
