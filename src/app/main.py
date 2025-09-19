@@ -262,9 +262,10 @@ async def proxy_test_results(session_id: str, request: Request, current_user: To
         raise HTTPException(status_code=503, detail="Performance service error")
 
 # Import and include routers
-from .routers import tests, rules, auth, rules_versioned, classify, users, evidence, test_results
+from .routers import tests, rules, auth, rules_versioned, classify, users, evidence, test_results, rtl
 
 app.include_router(auth.router, prefix="/v1/auth")
+app.include_router(rtl.router)  # RTL router has its own prefix (/v1/auth)
 app.include_router(tests.router, prefix="/v1/tests")
 app.include_router(evidence.router)  # Evidence router has its own prefix
 app.include_router(test_results.router)  # Test results router has its own prefix
