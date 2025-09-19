@@ -147,7 +147,8 @@ async def get_current_user(
     return token_data
 
 async def get_current_active_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    conn = Depends(get_database_connection)
 ) -> TokenData:
     """
     Foundational JWT Authorizer with Token Revocation List (RTL) check.
@@ -156,52 +157,35 @@ async def get_current_active_user(
     and checks against revocation list before returning token payload.
     """
     
-    # Extract JWT from Authorization: Bearer header
     token = credentials.credentials
     
     try:
-        # Decode and validate the JWT token
-        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
-        username = payload.get("sub")
-        user_id = payload.get("user_id")
-        jti = payload.get("jti")
-        exp = payload.get("exp")
-        
-        if not username or not user_id or not jti or not exp:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token payload",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        # Create token data object
-        token_data = TokenData(
-            username=username,
-            user_id=UUID(user_id),
-            jti=jti,
-            exp=datetime.fromtimestamp(exp)
-        )
+        # Delegate to verify_token for consistent validation
+        token_data = verify_token(token)
         
         # Critical RTL Check - query database for revoked tokens
-        if check_token_revocation(token_data.jti, get_database_connection()):
+        if check_token_revocation(token_data.jti, conn):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token has been revoked",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        # Return token payload if valid and not revoked
+        # Close connection and return token payload if valid and not revoked
+        conn.close()
         return token_data
         
-    except ExpiredSignatureError:
+    except HTTPException:
+        # Close connection on HTTP exceptions and re-raise
+        if conn:
+            conn.close()
+        raise
+    except Exception as e:
+        # Close connection on any other exception and return 401
+        if conn:
+            conn.close()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token expired",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
+            detail="Token validation failed",
             headers={"WWW-Authenticate": "Bearer"},
         )

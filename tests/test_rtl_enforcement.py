@@ -37,7 +37,7 @@ class TestRTLEnforcement:
         token = create_access_token(user_data)
         
         # Decode token without verification to check structure
-        decoded = jwt.decode(token, options={"verify_signature": False})
+        decoded = jwt.get_unverified_claims(token)
         
         # Verify jti is present and valid
         assert "jti" in decoded
@@ -61,7 +61,7 @@ class TestRTLEnforcement:
         token = create_access_token(user_data)
         
         # Extract jti from token
-        decoded = jwt.decode(token, options={"verify_signature": False})
+        decoded = jwt.get_unverified_claims(token)
         token_jti = decoded["jti"]
         
         # Mock database connection and RTL check
@@ -202,8 +202,8 @@ class TestRTLEnforcement:
         token2 = create_access_token(user_data)
         
         # Decode to get jtis
-        decoded1 = jwt.decode(token1, options={"verify_signature": False})
-        decoded2 = jwt.decode(token2, options={"verify_signature": False})
+        decoded1 = jwt.get_unverified_claims(token1)
+        decoded2 = jwt.get_unverified_claims(token2)
         
         # jtis should be different even for same user
         assert decoded1["jti"] != decoded2["jti"]
@@ -211,3 +211,71 @@ class TestRTLEnforcement:
         # Both should be valid UUIDs
         uuid.UUID(decoded1["jti"])
         uuid.UUID(decoded2["jti"])
+    
+    @pytest.mark.asyncio
+    async def test_get_current_active_user_handles_invalid_uuid_correctly(self):
+        """Test that get_current_active_user returns 401 (not 500) on malformed user_id."""
+        from fastapi import HTTPException
+        from fastapi.security import HTTPAuthorizationCredentials
+        from jose import jwt
+        
+        # Create token with invalid user_id format
+        invalid_token_data = {
+            "sub": "testuser",
+            "user_id": "not-a-valid-uuid",  # Invalid UUID
+            "jti": str(uuid.uuid4()),
+            "exp": int((datetime.utcnow() + timedelta(hours=1)).timestamp())
+        }
+        
+        invalid_token = jwt.encode(invalid_token_data, "test-secret", algorithm="HS256")
+        
+        # Mock credentials
+        credentials = Mock(spec=HTTPAuthorizationCredentials)
+        credentials.credentials = invalid_token
+        
+        # Mock database connection
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = [0]  # Not revoked
+        
+        # Should raise HTTPException with 401 (not 500) due to invalid UUID
+        with patch('src.app.dependencies.JWT_SECRET_KEY', 'test-secret'):
+            with pytest.raises(HTTPException) as exc_info:
+                await get_current_active_user(credentials, mock_conn)
+            
+            assert exc_info.value.status_code == 401
+            assert "token validation failed" in exc_info.value.detail.lower()
+        
+        # Verify database connection was closed
+        mock_conn.close.assert_called_once()
+    
+    @pytest.mark.asyncio
+    async def test_get_current_active_user_closes_db_connection(self):
+        """Test that get_current_active_user properly closes database connections."""
+        from fastapi.security import HTTPAuthorizationCredentials
+        
+        # Create valid token
+        user_data = {
+            "sub": "testuser",
+            "user_id": "550e8400-e29b-41d4-a716-446655440000"
+        }
+        token = create_access_token(user_data)
+        
+        # Mock credentials
+        credentials = Mock(spec=HTTPAuthorizationCredentials)
+        credentials.credentials = token
+        
+        # Mock database connection
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = [0]  # Not revoked
+        
+        # Should succeed and close connection
+        with patch('src.app.dependencies.JWT_SECRET_KEY', 'test-secret'):
+            result = await get_current_active_user(credentials, mock_conn)
+            assert isinstance(result, TokenData)
+        
+        # Verify database connection was closed
+        mock_conn.close.assert_called_once()
