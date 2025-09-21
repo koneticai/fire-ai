@@ -1,8 +1,8 @@
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import json
 
 class VectorClock:
-    def __init__(self, clock: Dict[str, int] = None):
+    def __init__(self, clock: Optional[Dict[str, int]] = None):
         self.clock = clock or {}
     
     def increment(self, node_id: str) -> None:
@@ -21,11 +21,19 @@ class VectorClock:
         return merged
     
     def happens_before(self, other: 'VectorClock') -> bool:
-        """Check if this clock happens-before another"""
-        for node, value in self.clock.items():
-            if value > other.clock.get(node, 0):
+        """Check if this clock happens-before another (strict comparison)"""
+        # All components must be <= and at least one must be strictly <
+        has_strictly_less = False
+        for node in set(self.clock.keys()) | set(other.clock.keys()):
+            self_val = self.clock.get(node, 0)
+            other_val = other.clock.get(node, 0)
+            
+            if self_val > other_val:
                 return False
-        return True
+            elif self_val < other_val:
+                has_strictly_less = True
+        
+        return has_strictly_less
     
     def to_json(self) -> str:
         return json.dumps(self.clock)

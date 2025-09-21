@@ -31,14 +31,14 @@ async def list_test_sessions(
     date_to: Optional[datetime] = Query(None),
     technician_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Dict = Depends(get_current_active_user)
+    current_user: TokenPayload = Depends(get_current_active_user)
 ):
     # Decode cursor
     cursor_data = decode_cursor(cursor) if cursor else {}
     
     # Build query with filters
     base_query = select(TestSession).where(
-        TestSession.created_by == current_user["user_id"]
+        TestSession.created_by == current_user.user_id
     )
     
     filters = {
@@ -50,7 +50,7 @@ async def list_test_sessions(
         }.items() if v is not None
     }
     
-    query = QueryBuilder(base_query)\
+    query = QueryBuilder(base_query, TestSession)\
         .apply_filters(filters)\
         .apply_cursor_pagination(cursor_data, limit)\
         .build()
@@ -58,17 +58,32 @@ async def list_test_sessions(
     result = await db.execute(query)
     sessions = result.scalars().all()
     
-    # Generate next cursor if we have results
+    # Handle limit+1 pagination logic
+    has_more = len(sessions) > limit
+    if has_more:
+        sessions = sessions[:limit]
+    
+    # Generate next cursor if we have more results
     next_cursor = None
-    if sessions and len(sessions) == limit:
+    if has_more and sessions:
         last_session = sessions[-1]
         next_cursor = encode_cursor({
             "id": last_session.id,
-            "vector_clock": last_session.vector_clock
+            "vector_clock": last_session.vector_clock,
+            "created_at": last_session.created_at
         })
     
     return {
-        "data": sessions,
+        "data": [
+            {
+                "session_id": str(s.id),
+                "building_id": str(s.building_id),
+                "status": s.status,
+                "session_name": s.session_name,
+                "created_at": s.created_at.isoformat(),
+                "vector_clock": s.vector_clock or {}
+            } for s in sessions
+        ],
         "next_cursor": next_cursor
     }
 
@@ -183,9 +198,9 @@ async def update_test_session(
         raise HTTPException(status_code=404, detail="Session not found")
     
     # Update vector clock for CRDT
-    vector_clock = session.vector_clock or {}
+    current_clock = session.vector_clock if session.vector_clock is not None else {}
     user_id = str(current_user.user_id)
-    vector_clock[user_id] = vector_clock.get(user_id, 0) + 1
+    current_clock[user_id] = current_clock.get(user_id, 0) + 1
     
     # Apply updates
     if "session_name" in updates:
@@ -195,7 +210,7 @@ async def update_test_session(
     if "session_data" in updates:
         session.session_data = updates["session_data"]
     
-    session.vector_clock = vector_clock
+    session.vector_clock = current_clock
     session.updated_at = datetime.utcnow()
     
     await db.commit()

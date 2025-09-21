@@ -21,7 +21,7 @@ def encode_cursor(data: Dict[str, Any]) -> str:
     cursor_data = {
         "last_evaluated_id": str(data.get("id")),
         "vector_clock": data.get("vector_clock", {}),
-        "created_at": data.get("created_at").isoformat() if data.get("created_at") else None
+        "created_at": data.get("created_at").isoformat() if data.get("created_at") is not None else None
     }
     return base64.b64encode(json.dumps(cursor_data).encode()).decode()
 
