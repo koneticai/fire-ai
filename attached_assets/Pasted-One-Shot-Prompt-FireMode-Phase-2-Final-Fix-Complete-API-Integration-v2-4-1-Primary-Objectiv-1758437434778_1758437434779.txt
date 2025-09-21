@@ -1,0 +1,295 @@
+One-Shot Prompt: FireMode Phase 2 Final Fix - Complete API & Integration (v2.4)
+
+1. Primary Objective
+Fix the remaining startup error and complete Phase 2 Task 2.1: Implement all API endpoints with full TDD v4.0 contract compliance, proper async operations, and integration with Phase 1 components.
+
+2. Critical Fix Required
+
+Step 2.1: Fix Missing error_handler
+Update src/app/main.py line 317:
+```python
+# Remove or comment out line 317:
+# app.add_exception_handler(HTTPException, error_handler)
+
+# Replace with proper import and handler:
+from fastapi import HTTPException, Request
+from fastapi.responses import JSONResponse
+import uuid
+
+async def error_handler(request: Request, exc: HTTPException):
+    error_registry = {
+        400: ("FIRE-400", "Bad Request: General validation error", False),
+        401: ("FIRE-401", "Unauthorized: Invalid or expired JWT", False),
+        403: ("FIRE-403", "Forbidden: Insufficient permissions", False),
+        404: ("FIRE-404", "Not Found: Resource does not exist", True),
+        409: ("FIRE-409", "Conflict: CRDT merge conflict or idempotency key reuse", False),
+        422: ("FIRE-422", "Unprocessable Entity: Semantic validation error", False),
+        429: ("FIRE-429", "Too Many Requests: Rate limit exceeded", True),
+        500: ("FIRE-500", "Internal Server Error: Generic server failure", True),
+        503: ("FIRE-503", "Service Unavailable: Downstream dependency failure", True),
+    }
+    
+    error_code, message, retryable = error_registry.get(
+        exc.status_code, 
+        ("FIRE-500", "Internal Server Error", True)
+    )
+    
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "transaction_id": str(uuid.uuid4()),
+            "error_code": error_code,
+            "message": exc.detail or message,
+            "retryable": retryable
+        }
+    )
+
+app.add_exception_handler(HTTPException, error_handler)
+
+Complete Missing Implementations
+
+Step 3.1: Fix Test Sessions Router
+Update src/app/routers/test_sessions.py with actual database queries:
+pythonfrom fastapi import APIRouter, Depends, Query, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, and_
+from typing import Optional, List
+import base64
+import json
+import uuid
+from datetime import datetime
+from ..database.core import get_db
+from ..models.test_sessions import TestSession
+from ..schemas.token import TokenData
+from ..dependencies import get_current_active_user
+
+router = APIRouter(prefix="/v1/tests/sessions", tags=["test_sessions"])
+
+@router.post("/", status_code=201)
+async def create_test_session(
+    building_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: TokenData = Depends(get_current_active_user)
+):
+    session = TestSession(
+        id=uuid.uuid4(),
+        building_id=building_id,
+        status="pending",
+        vector_clock={str(current_user.user_id): 1},
+        created_at=datetime.utcnow()
+    )
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+    
+    return {
+        "session_id": str(session.id),
+        "building_id": str(session.building_id),
+        "status": session.status,
+        "created_at": session.created_at.isoformat()
+    }
+
+@router.get("/")
+async def list_test_sessions(
+    limit: int = Query(20, ge=1, le=100),
+    cursor: Optional[str] = None,
+    status: Optional[List[str]] = Query(None),
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: TokenData = Depends(get_current_active_user)
+):
+    # Build query with filters
+    query = select(TestSession)
+    conditions = []
+    
+    # Decode cursor if provided
+    if cursor:
+        try:
+            cursor_data = json.loads(base64.b64decode(cursor))
+            if "last_evaluated_id" in cursor_data:
+                conditions.append(TestSession.id > cursor_data["last_evaluated_id"])
+        except:
+            raise HTTPException(status_code=400, detail="Invalid cursor")
+    
+    # Apply filters
+    if status:
+        conditions.append(TestSession.status.in_(status))
+    if date_from:
+        conditions.append(TestSession.created_at >= date_from)
+    if date_to:
+        conditions.append(TestSession.created_at <= date_to)
+    
+    if conditions:
+        query = query.where(and_(*conditions))
+    
+    # Order and limit
+    query = query.order_by(TestSession.created_at, TestSession.id).limit(limit + 1)
+    
+    # Execute query
+    result = await db.execute(query)
+    sessions = result.scalars().all()
+    
+    # Handle pagination
+    next_cursor = None
+    if len(sessions) > limit:
+        sessions = sessions[:limit]
+        last_session = sessions[-1]
+        cursor_data = {
+            "last_evaluated_id": str(last_session.id),
+            "vector_clock": last_session.vector_clock or {}
+        }
+        next_cursor = base64.b64encode(json.dumps(cursor_data).encode()).decode()
+    
+    return {
+        "data": [
+            {
+                "session_id": str(s.id),
+                "building_id": str(s.building_id) if s.building_id else None,
+                "status": s.status,
+                "created_at": s.created_at.isoformat()
+            } for s in sessions
+        ],
+        "next_cursor": next_cursor
+    }
+
+@router.post("/{session_id}/results")
+async def submit_results(
+    session_id: str,
+    changes: List[dict],
+    idempotency_key: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: TokenData = Depends(get_current_active_user)
+):
+    # Forward to Go service for CRDT processing
+    import httpx
+    from ..proxy import create_internal_token
+    
+    internal_token = create_internal_token()
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"http://localhost:9090/v1/tests/sessions/{session_id}/results",
+            json={"changes": changes, "idempotency_key": idempotency_key},
+            headers={"X-Internal-Authorization": internal_token}
+        )
+    
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail="CRDT processing failed")
+    
+    return response.json()
+Step 3.2: Complete Evidence Router Integration
+Update src/app/routers/evidence.py:
+pythonfrom fastapi import APIRouter, Depends, UploadFile, Form, HTTPException
+import httpx
+from ..schemas.token import TokenData
+from ..dependencies import get_current_active_user
+from ..proxy import create_internal_token
+
+router = APIRouter(prefix="/v1", tags=["evidence"])
+
+@router.post("/evidence")
+async def upload_evidence(
+    file: UploadFile,
+    sha256_hash: str = Form(...),
+    current_user: TokenData = Depends(get_current_active_user)
+):
+    # Create internal token for Go service
+    internal_token = create_internal_token()
+    
+    # Forward to Go service
+    async with httpx.AsyncClient() as client:
+        files = {"file": (file.filename, await file.read(), file.content_type)}
+        data = {"sha256_hash": sha256_hash}
+        
+        response = await client.post(
+            "http://localhost:9090/v1/evidence",
+            files=files,
+            data=data,
+            headers={
+                "X-Internal-Authorization": internal_token,
+                "X-User-ID": str(current_user.user_id)
+            }
+        )
+    
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail="Evidence upload failed")
+    
+    return response.json()
+Step 3.3: Create Proxy Helper
+Create src/app/proxy.py:
+pythonfrom jose import jwt
+from datetime import datetime, timedelta
+import os
+
+def create_internal_token():
+    secret_key = os.getenv("INTERNAL_JWT_SECRET_KEY", "internal-secret-key")
+    expire = datetime.utcnow() + timedelta(minutes=5)
+    
+    return jwt.encode(
+        {"exp": expire, "type": "internal"},
+        secret_key,
+        algorithm="HS256"
+    )
+Step 3.4: Implement Contract Tests
+Create tests/test_contracts_real.py:
+pythonimport pytest
+from httpx import AsyncClient
+from src.app.main import app
+import uuid
+
+@pytest.mark.asyncio
+async def test_standardized_error_format():
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        response = await client.get("/v1/nonexistent")
+        assert response.status_code == 404
+        error = response.json()
+        assert "transaction_id" in error
+        assert error["error_code"] == "FIRE-404"
+        assert error["retryable"] is True
+        assert "message" in error
+
+@pytest.mark.asyncio
+async def test_test_sessions_pagination():
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        # Mock auth header
+        headers = {"Authorization": "Bearer test-token"}
+        
+        response = await client.get("/v1/tests/sessions", headers=headers)
+        assert response.status_code in [200, 401]  # Depends on auth
+        
+        if response.status_code == 200:
+            data = response.json()
+            assert "data" in data
+            assert "next_cursor" in data
+            assert isinstance(data["data"], list)
+
+@pytest.mark.asyncio
+async def test_health_endpoint():
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        response = await client.get("/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+
+Database Migration Setup
+
+Step 4.1: Create Alembic Migration
+Run in shell:
+bashpoetry run alembic revision --autogenerate -m "Phase 2 complete models"
+poetry run alembic upgrade head
+
+Final Startup Verification
+
+Step 5.1: Update .env file
+Ensure all required environment variables:
+bashDATABASE_URL=postgresql://user:pass@localhost/firemode
+JWT_SECRET_KEY=your-secret-key-here-minimum-32-chars
+INTERNAL_JWT_SECRET_KEY=internal-secret-key-here
+Step 5.2: Restart Services
+Run in shell:
+bash# Stop any running processes
+pkill -f "python src/app/supervisor.py"
+
+# Start fresh
+poetry run python src/app/supervisor.py
