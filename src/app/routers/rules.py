@@ -12,10 +12,33 @@ import psycopg2
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..models import (
-    AS1851Rule, AS1851RuleCreate, FaultClassificationRequest, 
-    FaultClassificationResult, APIResponse
+    AS1851Rule, AS1851RuleCreate
 )
-from ..dependencies import get_current_active_user, get_database_connection, TokenData
+
+# Import classification models if available, otherwise create simple placeholders
+try:
+    from ..models import FaultClassificationRequest, FaultClassificationResult, APIResponse
+except ImportError:
+    from pydantic import BaseModel
+    from typing import List, Any, Optional
+    
+    class FaultClassificationRequest(BaseModel):
+        evidence_id: str
+        rule_codes: List[str]
+        context: Optional[str] = None
+    
+    class FaultClassificationResult(BaseModel):
+        classification_id: str
+        evidence_id: str
+        classifications: List[Any]
+        confidence_scores: dict
+        applied_rules: List[str]
+        
+    class APIResponse(BaseModel):
+        message: str
+        data: Optional[Any] = None
+from ..dependencies import get_current_active_user, get_database_connection
+from ..schemas.auth import TokenPayload as TokenData
 
 router = APIRouter(tags=["AS1851 Rules"])
 

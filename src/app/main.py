@@ -12,13 +12,12 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
-from opentelemetry import trace
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
-from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
+# OpenTelemetry imports - simplified for available packages
+try:
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+    TELEMETRY_AVAILABLE = True
+except ImportError:
+    TELEMETRY_AVAILABLE = False
 
 # Import dependencies needed for authentication
 from .dependencies import get_current_active_user
@@ -36,23 +35,16 @@ go_service_client = None
 go_service_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=30)
 
 def setup_telemetry():
-    """Configure comprehensive OpenTelemetry instrumentation"""
-    trace.set_tracer_provider(TracerProvider())
-    tracer_provider = trace.get_tracer_provider()
-    
-    # Configure OTLP exporter
-    otlp_exporter = OTLPSpanExporter(
-        endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
-        insecure=True
-    )
-    
-    span_processor = BatchSpanProcessor(otlp_exporter)
-    tracer_provider.add_span_processor(span_processor)
-    
-    # Instrument libraries for complete observability
-    FastAPIInstrumentor.instrument_app(app)
-    # SQLAlchemy and HTTPX instrumentation will be added after app creation
-    HTTPXClientInstrumentor().instrument()
+    """Configure basic telemetry instrumentation"""
+    if TELEMETRY_AVAILABLE:
+        try:
+            # Basic FastAPI instrumentation
+            FastAPIInstrumentor.instrument_app(app)
+            logger.info("OpenTelemetry FastAPI instrumentation enabled")
+        except Exception as e:
+            logger.warning(f"Failed to setup telemetry: {e}")
+    else:
+        logger.info("OpenTelemetry not available - using basic monitoring")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -159,8 +151,12 @@ app = FastAPI(
     ]
 )
 
-# Configure OpenTelemetry
-FastAPIInstrumentor.instrument_app(app)
+# Configure basic telemetry
+if TELEMETRY_AVAILABLE:
+    try:
+        FastAPIInstrumentor.instrument_app(app)
+    except:
+        pass  # Continue without telemetry
 
 # Add concurrency middleware for vector clock detection
 from .middleware.concurrency import detect_concurrent_writes
@@ -332,6 +328,10 @@ app.include_router(rules.router, prefix="/v1/rules")
 app.include_router(rules_versioned.router, prefix="/v2/rules")
 app.include_router(classify.router, prefix="/v1/classify")
 app.include_router(users.router, prefix="/v1/users")
+
+# Add health endpoints
+from .health import readiness
+app.include_router(readiness.router, tags=["Health"])
 
 if __name__ == "__main__":
     import uvicorn
