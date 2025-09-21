@@ -2,15 +2,24 @@
 FastAPI dependencies for authentication and database
 """
 
+import os
+import secrets
+from datetime import datetime, timedelta
+from typing import Optional
+from uuid import UUID
+
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer
-from jose import JWTError, jwt
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import JWTError, jwt, ExpiredSignatureError
+import psycopg2
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from .config import settings
 from .database.core import get_db
 from .models.rtl import TokenRevocationList
 from .schemas.token import TokenData
+from .schemas.auth import TokenPayload
 
 security = HTTPBearer()
 
