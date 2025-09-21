@@ -13,7 +13,6 @@ import httpx
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from .utils.errors import error_handler
 
 # Import dependencies needed for authentication
 from .dependencies import get_current_active_user

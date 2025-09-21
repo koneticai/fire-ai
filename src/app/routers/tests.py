@@ -12,7 +12,8 @@ import psycopg2
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 
-from ..models import TestSession
+from ..models import TestSession as TestSessionModel
+from ..schemas.test_session import TestSessionRead, TestSessionCreate, TestSessionListResponse
 # Note: Using simplified imports since full test session API is now in test_sessions.py
 from ..dependencies import get_current_active_user, get_database_connection
 from ..schemas.auth import TokenPayload
@@ -151,7 +152,7 @@ async def list_test_sessions(
             next_cursor = None
             
             for row in rows:
-                session = TestSession(
+                session = TestSessionRead(
                     id=row[0],
                     building_id=row[1],
                     session_name=row[2],
@@ -218,12 +219,12 @@ async def create_test_session(
         
         conn.close()
         
-        return TestSession(
+        return TestSessionRead(
             id=session_id,
             building_id=session_data.building_id,
             session_name=session_data.session_name,
             status=session_data.status,
-            vector_clock={"created": 1, "actor": current_user.user_id},
+            vector_clock={"created": 1, "actor": str(current_user.user_id)},
             session_data=session_data.session_data,
             created_by=current_user.user_id,
             created_at=created_at,
@@ -237,7 +238,7 @@ async def create_test_session(
             detail=f"Failed to create test session: {str(e)}"
         )
 
-@router.get("/sessions/{session_id}", response_model=TestSession, summary="Get Test Session", description="Retrieve a specific fire safety test session by its unique identifier")
+@router.get("/sessions/{session_id}", response_model=TestSessionRead, summary="Get Test Session", description="Retrieve a specific fire safety test session by its unique identifier")
 async def get_test_session(
     session_id: UUID,
     current_user: TokenPayload = Depends(get_current_active_user),
@@ -258,7 +259,7 @@ async def get_test_session(
             if not row:
                 raise HTTPException(status_code=404, detail="Test session not found")
             
-            session = TestSession(
+            session = TestSessionRead(
                 id=row[0],
                 building_id=row[1],
                 session_name=row[2],
