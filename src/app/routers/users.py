@@ -10,7 +10,8 @@ from uuid import UUID
 import psycopg2
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 
-from ..models import UserProfile, AuditLogEntry, TokenData
+from ..models import UserProfile, AuditLogEntry
+from ..schemas.token import TokenData
 from ..dependencies import get_current_active_user, get_database_connection
 from ..security import decrypt_pii
 

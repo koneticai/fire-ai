@@ -11,7 +11,7 @@ from uuid import UUID
 import psycopg2
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 
-from ..models import TokenData, APIResponse
+from ..schemas.token import TokenData, APIResponse
 from ..dependencies import get_current_active_user, get_database_connection
 
 router = APIRouter(tags=["Authentication"])

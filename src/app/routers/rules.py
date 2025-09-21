@@ -17,8 +17,10 @@ from ..models import (
 
 # Import classification models if available, otherwise create simple placeholders
 try:
-    from ..models import FaultClassificationRequest, FaultClassificationResult, APIResponse
+    from ..models import FaultClassificationRequest, FaultClassificationResult
+    from ..schemas.token import APIResponse
 except ImportError:
+    from ..schemas.token import APIResponse
     from pydantic import BaseModel
     from typing import List, Any, Optional
     
@@ -38,7 +40,7 @@ except ImportError:
         message: str
         data: Optional[Any] = None
 from ..dependencies import get_current_active_user, get_database_connection
-from ..schemas.auth import TokenPayload as TokenData
+from ..schemas.token import TokenData
 
 router = APIRouter(tags=["AS1851 Rules"])
 

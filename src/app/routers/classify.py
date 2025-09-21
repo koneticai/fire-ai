@@ -7,7 +7,7 @@ import httpx
 from fastapi import APIRouter, Depends, status, Request, HTTPException
 from fastapi.responses import JSONResponse
 
-from ..models import FaultDataInput, ClassificationResult, TokenData
+from ..schemas.token import TokenData, FaultDataInput, ClassificationResult
 from ..dependencies import get_current_active_user
 from ..internal_jwt import get_internal_jwt_token
 

@@ -12,8 +12,9 @@ import psycopg2
 import semver
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 
-from ..models import AS1851Rule, AS1851RuleCreate, APIResponse
-from ..dependencies import get_current_active_user, get_database_connection, TokenData
+from ..models import AS1851Rule, AS1851RuleCreate
+from ..dependencies import get_current_active_user, get_database_connection
+from ..schemas.token import TokenData, APIResponse
 
 router = APIRouter(tags=["AS1851 Rules (Versioned)"])
 

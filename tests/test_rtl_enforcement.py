@@ -21,7 +21,7 @@ from src.app.dependencies import (
     JWT_SECRET_KEY,
     JWT_ALGORITHM
 )
-from src.app.models import TokenData
+from src.app.schemas.token import TokenData
 
 
 class TestRTLEnforcement:
