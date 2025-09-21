@@ -25,6 +25,7 @@ from .schemas.auth import TokenPayload
 from .internal_jwt import get_internal_jwt_token
 from .process_manager import get_go_service_manager
 from .utils.resilience import CircuitBreaker, retry_with_backoff, with_circuit_breaker
+from .utils.errors import error_handler
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -319,33 +320,6 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import uuid
 
-async def error_handler(request: Request, exc: HTTPException):
-    error_registry = {
-        400: ("FIRE-400", "Bad Request: General validation error", False),
-        401: ("FIRE-401", "Unauthorized: Invalid or expired JWT", False),
-        403: ("FIRE-403", "Forbidden: Insufficient permissions", False),
-        404: ("FIRE-404", "Not Found: Resource does not exist", True),
-        409: ("FIRE-409", "Conflict: CRDT merge conflict or idempotency key reuse", False),
-        422: ("FIRE-422", "Unprocessable Entity: Semantic validation error", False),
-        429: ("FIRE-429", "Too Many Requests: Rate limit exceeded", True),
-        500: ("FIRE-500", "Internal Server Error: Generic server failure", True),
-        503: ("FIRE-503", "Service Unavailable: Downstream dependency failure", True),
-    }
-    
-    error_code, message, retryable = error_registry.get(
-        exc.status_code, 
-        ("FIRE-500", "Internal Server Error", True)
-    )
-    
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "transaction_id": str(uuid.uuid4()),
-            "error_code": error_code,
-            "message": exc.detail or message,
-            "retryable": retryable
-        }
-    )
 
 async def global_404_handler(request: Request, exc: StarletteHTTPException):
     """Global 404 handler for FIRE error format compliance"""
