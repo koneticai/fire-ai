@@ -12,7 +12,13 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 # Import dependencies needed for authentication
 from .dependencies import get_current_active_user
@@ -29,6 +35,25 @@ logger = logging.getLogger(__name__)
 go_service_client = None
 go_service_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=30)
 
+def setup_telemetry():
+    """Configure comprehensive OpenTelemetry instrumentation"""
+    trace.set_tracer_provider(TracerProvider())
+    tracer_provider = trace.get_tracer_provider()
+    
+    # Configure OTLP exporter
+    otlp_exporter = OTLPSpanExporter(
+        endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
+        insecure=True
+    )
+    
+    span_processor = BatchSpanProcessor(otlp_exporter)
+    tracer_provider.add_span_processor(span_processor)
+    
+    # Instrument libraries for complete observability
+    FastAPIInstrumentor.instrument_app(app)
+    # SQLAlchemy and HTTPX instrumentation will be added after app creation
+    HTTPXClientInstrumentor().instrument()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager to start/stop Go service"""
@@ -38,6 +63,10 @@ async def lifespan(app: FastAPI):
     process_manager = get_go_service_manager()
     
     try:
+        # Setup telemetry
+        setup_telemetry()
+        logger.info("OpenTelemetry instrumentation configured")
+        
         # Start Go service using process manager
         logger.info("Starting Go service with process manager...")
         if await process_manager.start():
@@ -136,6 +165,10 @@ FastAPIInstrumentor.instrument_app(app)
 # Add concurrency middleware for vector clock detection
 from .middleware.concurrency import detect_concurrent_writes
 app.middleware("http")(detect_concurrent_writes)
+
+# Add performance tracking middleware
+from .metrics.performance import track_performance
+app.middleware("http")(track_performance)
 
 # Root endpoint
 @app.get("/", tags=["Health"])

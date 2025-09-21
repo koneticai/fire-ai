@@ -131,7 +131,7 @@ async def list_test_sessions(
                 # Decode base64 cursor to get vector_clock
                 cursor_data = json.loads(base64.b64decode(cursor).decode())
                 cursor_condition = "AND vector_clock::text > %s"
-                params.append(json.dumps(cursor_data))
+                params.append(str(cursor_data))
             except (ValueError, json.JSONDecodeError):
                 raise HTTPException(status_code=400, detail="Invalid cursor format")
         
@@ -190,7 +190,7 @@ async def list_test_sessions(
 
 @router.post("/sessions", summary="Create Test Session", description="Create a new fire safety test session for a building with CRDT vector clock initialization")
 async def create_test_session(
-    session_data: dict,
+    session_data: TestSessionCreate,
     current_user: TokenPayload = Depends(get_current_active_user),
     conn = Depends(get_database_connection)
 ):
