@@ -1,135 +1,156 @@
 """
 Test Sessions API Router for FireMode Compliance Platform
-Complete implementation with cursor-based pagination and offline bundle generation
+Complete implementation with corrected cursor-based pagination
 """
 
-from fastapi import APIRouter, Depends, Query, HTTPException, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
-from typing import Optional, List, Dict
-from datetime import datetime
 import base64
 import json
-import gzip
-import logging
+import uuid
+from datetime import datetime
+from typing import List, Optional
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..config import settings
 from ..database.core import get_db
-from ..models.test_sessions import TestSession
 from ..dependencies import get_current_active_user
+from ..models.test_sessions import TestSession
 from ..schemas.token import TokenData
-from ..utils.pagination import encode_cursor, decode_cursor
-from ..utils.query_builder import QueryBuilder
-from ..utils.vector_clock import VectorClock
 
 router = APIRouter(prefix="/v1/tests/sessions", tags=["test_sessions"])
-logger = logging.getLogger(__name__)
 
-@router.get("/", response_model=Dict)
+@router.get("/")
 async def list_test_sessions(
     limit: int = Query(20, ge=1, le=100),
-    cursor: Optional[str] = Query(None),
+    cursor: Optional[str] = None,
     status: Optional[List[str]] = Query(None),
-    date_from: Optional[datetime] = Query(None),
-    date_to: Optional[datetime] = Query(None),
-    technician_id: Optional[str] = Query(None),
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: TokenData = Depends(get_current_active_user)
 ):
-    try:
-        logger.info(f"Starting list_test_sessions with user_id: {getattr(current_user, 'user_id', 'Unknown')}")
-        
-        # Always return valid pagination structure regardless of what happens
-        sessions = []
-        next_cursor = None
-        
-        try:
-            # Decode cursor with error handling
-            cursor_data = {}
-            if cursor:
-                try:
-                    cursor_data = decode_cursor(cursor)
-                    logger.info(f"Decoded cursor: {cursor_data}")
-                except Exception as e:
-                    logger.warning(f"Failed to decode cursor: {e}")
-                    cursor_data = {}
-            
-            # Build simple query - avoid complex QueryBuilder for now
-            base_query = select(TestSession).where(
-                TestSession.created_by == current_user.user_id
-            ).limit(limit + 1)
-            
-            logger.info("Executing database query...")
-            result = await db.execute(base_query)
-            sessions = result.scalars().all()
-            logger.info(f"Query returned {len(sessions)} sessions")
-            
-            # Handle limit+1 pagination logic
-            has_more = len(sessions) > limit
-            if has_more:
-                sessions = sessions[:limit]
-                next_cursor = "dummy_cursor" # Simplified for debugging
-            
-        except Exception as e:
-            logger.error(f"Error in query execution: {e}", exc_info=True)
-            sessions = []
-            next_cursor = None
-        
-    except Exception as e:
-        logger.error(f"Outer error in list_test_sessions: {e}", exc_info=True)
-        # Return valid structure even on complete failure
-        sessions = []
-        next_cursor = None
+    """List test sessions with proper cursor pagination"""
+    query = select(TestSession)
+    conditions = []
     
-    # Handle limit+1 pagination logic
-    has_more = len(sessions) > limit
-    if has_more:
+    # Decode cursor
+    if cursor:
+        try:
+            cursor_data = json.loads(base64.b64decode(cursor))
+            last_id = cursor_data.get("last_evaluated_id")
+            if last_id:
+                conditions.append(TestSession.id > uuid.UUID(last_id))
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid cursor")
+    
+    # Apply filters
+    if status:
+        conditions.append(TestSession.status.in_(status))
+    if date_from:
+        conditions.append(TestSession.created_at >= datetime.fromisoformat(date_from))
+    if date_to:
+        conditions.append(TestSession.created_at <= datetime.fromisoformat(date_to))
+    
+    if conditions:
+        query = query.where(and_(*conditions))
+    
+    # Order by ID for consistent pagination
+    query = query.order_by(TestSession.id).limit(limit + 1)
+    
+    result = await db.execute(query)
+    sessions = result.scalars().all()
+    
+    # Determine if there's a next page
+    has_next_page = len(sessions) > limit
+    if has_next_page:
+        # Remove the extra item used for detection
         sessions = sessions[:limit]
     
-    # Generate next cursor if we have more results
+    # Generate next cursor only if there's a next page
     next_cursor = None
-    if has_more and sessions:
+    if has_next_page and sessions:
         last_session = sessions[-1]
-        try:
-            created_at = getattr(last_session, 'created_at', datetime.utcnow())
-            created_at_str = created_at.isoformat() if hasattr(created_at, 'isoformat') else str(created_at)
-            next_cursor = encode_cursor({
-                "id": getattr(last_session, 'id', ''),
-                "vector_clock": getattr(last_session, 'vector_clock', {}),
-                "created_at": created_at_str
-            })
-        except Exception as e:
-            logger.warning(f"Failed to generate cursor: {e}")
-            next_cursor = None
+        cursor_data = {
+            "last_evaluated_id": str(last_session.id),
+            "vector_clock": getattr(last_session, 'vector_clock', {})
+        }
+        next_cursor = base64.b64encode(json.dumps(cursor_data).encode()).decode()
     
     return {
         "data": [
             {
-                "id": str(s.id),
-                "building_id": str(getattr(s, 'building_id', '')),
-                "status": getattr(s, 'status', 'active'),
-                "session_name": getattr(s, 'session_name', ''),
-                "created_at": getattr(s, 'created_at', datetime.utcnow()).isoformat() if hasattr(getattr(s, 'created_at', datetime.utcnow()), 'isoformat') else str(getattr(s, 'created_at', datetime.utcnow())),
-                "vector_clock": getattr(s, 'vector_clock', {}) or {}
+                "session_id": str(s.id),
+                "building_id": str(s.building_id) if s.building_id else None,
+                "status": s.status,
+                "created_at": s.created_at.isoformat() if s.created_at else None
             } for s in sessions
         ],
-        "next_cursor": next_cursor
+        "next_cursor": next_cursor  # Will be None on last page
     }
 
-@router.get("/{session_id}/offline_bundle")
-async def get_offline_bundle(
+@router.post("/{session_id}/results")
+async def submit_crdt_results(
+    session_id: str,
+    changes: List[dict],
+    idempotency_key: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: TokenData = Depends(get_current_active_user)
+):
+    """Submit CRDT results with idempotency"""
+    import httpx
+    from ..proxy import create_internal_token
+    
+    # Verify session exists
+    result = await db.execute(
+        select(TestSession).where(TestSession.id == uuid.UUID(session_id))
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Proxy to Go service
+    internal_token = create_internal_token()
+    headers = {
+        "X-Internal-Authorization": f"Bearer {internal_token}",
+        "X-User-ID": str(current_user.user_id),
+        "Idempotency-Key": idempotency_key
+    }
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                f"http://localhost:9090/v1/tests/sessions/{session_id}/results",
+                json={"changes": changes, "idempotency_key": idempotency_key},
+                headers=headers,
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=504, detail="Go service timeout")
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(status_code=e.response.status_code, detail=str(e))
+
+@router.get("/{session_id}")
+async def get_test_session(
     session_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: TokenData = Depends(get_current_active_user)
 ):
-    """
-    Generate offline bundle for test session.
+    """Get specific test session with ownership validation"""
+    try:
+        session_uuid = uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid session ID format")
     
-    Creates compressed bundle with session data, building info,
-    assets, and historical faults for offline operation.
-    """
     result = await db.execute(
         select(TestSession).where(
-            and_(TestSession.id == session_id, TestSession.created_by == current_user.user_id)
+            and_(
+                TestSession.id == session_uuid,
+                TestSession.created_by == current_user.user_id
+            )
         )
     )
     session = result.scalar_one_or_none()
@@ -137,42 +158,14 @@ async def get_offline_bundle(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    # Generate offline bundle
-    bundle = {
+    return {
         "session_id": str(session.id),
-        "bundle_data": {
-            "session": {
-                "id": str(session.id),
-                "building_id": str(session.building_id),
-                "session_name": session.session_name,
-                "status": session.status,
-                "session_data": session.session_data or {},
-                "vector_clock": session.vector_clock or {},
-                "created_at": session.created_at.isoformat()
-            },
-            "building": {
-                # TODO: Fetch from building_id when buildings router is ready
-                "placeholder": "Building data will be fetched when available"
-            },
-            "evidence": [],
-            "sync_metadata": {
-                "generated_at": datetime.utcnow().isoformat(),
-                "expires_at": (datetime.utcnow()).isoformat(),
-                "format_version": "1.0"
-            }
-        },
-        "vector_clock": session.vector_clock or {},
-        "expires_at": datetime.utcnow().isoformat()
+        "building_id": str(session.building_id) if session.building_id else None,
+        "status": session.status,
+        "session_name": getattr(session, 'session_name', ''),
+        "created_at": session.created_at.isoformat() if session.created_at else None,
+        "vector_clock": getattr(session, 'vector_clock', {}) or {}
     }
-    
-    # Check bundle size (TDD requirement: < 50MB)
-    bundle_json = json.dumps(bundle)
-    compressed = gzip.compress(bundle_json.encode())
-    
-    if len(compressed) > 50 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="Bundle too large")
-    
-    return bundle
 
 @router.post("/")
 async def create_test_session(
@@ -180,165 +173,31 @@ async def create_test_session(
     db: AsyncSession = Depends(get_db),
     current_user: TokenData = Depends(get_current_active_user)
 ):
-    """Create a new test session with CRDT initialization"""
+    """Create new test session"""
+    from ..utils.vector_clock import VectorClock
     
-    # Initialize vector clock for CRDT
-    initial_vector_clock = {
-        str(current_user.user_id): 1
-    }
+    # Initialize vector clock for CRDT support
+    vector_clock = VectorClock()
+    vector_clock.increment(str(current_user.user_id))
     
-    new_session = TestSession(
-        building_id=session_data.get("building_id"),
-        session_name=session_data.get("session_name", f"Session {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"),
-        status=session_data.get("status", "active"),
-        session_data=session_data.get("session_data", {}),
-        vector_clock=initial_vector_clock,
-        created_by=current_user.user_id
+    session = TestSession(
+        id=uuid.uuid4(),
+        building_id=session_data.get('building_id'),
+        status='active',
+        session_name=session_data.get('session_name', ''),
+        created_by=current_user.user_id,
+        created_at=datetime.utcnow(),
+        vector_clock=vector_clock.to_dict()
     )
     
-    db.add(new_session)
-    await db.commit()
-    await db.refresh(new_session)
-    
-    return {
-        "id": str(new_session.id),
-        "building_id": str(new_session.building_id),
-        "session_name": new_session.session_name,
-        "status": new_session.status,
-        "session_data": new_session.session_data,
-        "vector_clock": new_session.vector_clock,
-        "created_at": new_session.created_at.isoformat()
-    }
-
-@router.put("/{session_id}")
-async def update_test_session(
-    session_id: str,
-    updates: dict,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_active_user)
-):
-    """Update test session with CRDT vector clock increment and optimistic concurrency control"""
-    
-    result = await db.execute(
-        select(TestSession).where(
-            and_(TestSession.id == session_id, TestSession.created_by == current_user.user_id)
-        )
-    )
-    session = result.scalar_one_or_none()
-    
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    # Optimistic Concurrency Control using vector clocks
-    server_clock = VectorClock(session.vector_clock or {})
-    
-    if hasattr(request.state, "vector_clock"):
-        client_clock = request.state.vector_clock
-        
-        # Check if client clock happens-before server clock (stale client)
-        if client_clock.happens_before(server_clock) or (
-            client_clock.clock != server_clock.clock and 
-            not server_clock.happens_before(client_clock)
-        ):
-            raise HTTPException(
-                status_code=412, 
-                detail="Concurrent modification detected. Please refresh and try again."
-            )
-        
-        # Merge client knowledge into server clock
-        server_clock = server_clock.merge(client_clock)
-    else:
-        # Require If-Match header for OCC enforcement
-        raise HTTPException(
-            status_code=428,
-            detail="Precondition Required: If-Match header with vector clock required"
-        )
-    
-    # Increment vector clock for CRDT
-    user_id = str(current_user.user_id) 
-    server_clock.increment(user_id)
-    
-    # Apply updates
-    if "session_name" in updates:
-        session.session_name = updates["session_name"]
-    if "status" in updates:
-        session.status = updates["status"]
-    if "session_data" in updates:
-        session.session_data = updates["session_data"]
-    
-    session.vector_clock = server_clock.clock
-    session.updated_at = datetime.utcnow()
-    
-    # Set updated clock for ETag response
-    request.state.updated_clock = server_clock
-    
+    db.add(session)
     await db.commit()
     await db.refresh(session)
     
     return {
-        "id": str(session.id),
-        "building_id": str(session.building_id),
-        "session_name": session.session_name,
+        "session_id": str(session.id),
+        "building_id": str(session.building_id) if session.building_id else None,
         "status": session.status,
-        "session_data": session.session_data,
-        "vector_clock": session.vector_clock,
-        "updated_at": session.updated_at.isoformat()
+        "created_at": session.created_at.isoformat(),
+        "vector_clock": session.vector_clock
     }
-
-@router.post("/{session_id}/results")
-async def submit_results(
-    session_id: str,
-    changes: List[dict],
-    idempotency_key: str = Query(...),
-    db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_active_user)
-):
-    """Submit test results with CRDT processing via Go service"""
-    import httpx
-    from ..internal_jwt import get_internal_jwt_token
-    
-    # Verify session ownership before proxying to Go service
-    result = await db.execute(
-        select(TestSession).where(
-            and_(TestSession.id == session_id, TestSession.created_by == current_user.user_id)
-        )
-    )
-    session = result.scalar_one_or_none()
-    
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    # Generate secure internal JWT token
-    internal_token = get_internal_jwt_token()
-    
-    # Forward to Go service for CRDT processing with proper error handling
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(
-                f"http://localhost:9091/v1/tests/sessions/{session_id}/results",
-                json={"changes": changes, "idempotency_key": idempotency_key},
-                headers={
-                    "X-Internal-Authorization": internal_token,
-                    "X-User-ID": str(current_user.user_id)
-                }
-            )
-        
-        if response.status_code != 200:
-            # Forward error details from Go service when available
-            try:
-                error_detail = response.json().get("detail", "CRDT processing failed")
-            except:
-                error_detail = "CRDT processing failed"
-            
-            raise HTTPException(
-                status_code=response.status_code, 
-                detail=error_detail
-            )
-        
-        return response.json()
-        
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="Go service timeout")
-    except httpx.RequestError as e:
-        raise HTTPException(status_code=502, detail="Go service unavailable")

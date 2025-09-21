@@ -246,3 +246,8 @@ go_service_proxy = GoServiceProxy()
 async def get_go_service_proxy() -> GoServiceProxy:
     """Dependency to get the Go service proxy."""
     return go_service_proxy
+
+def create_internal_token() -> str:
+    """Create short-lived JWT for internal service communication"""
+    from .internal_jwt import get_internal_jwt_token
+    return get_internal_jwt_token()

@@ -2,28 +2,52 @@
 FastAPI dependencies for authentication and database
 """
 
-import os
-import secrets
-from datetime import datetime, timedelta
-from typing import Optional
-from uuid import UUID
-
-from jose import jwt, JWTError, ExpiredSignatureError
-import psycopg2
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer
+from jose import JWTError, jwt
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from .schemas.auth import TokenPayload
-
-# Security configuration
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
-if not JWT_SECRET_KEY:
-    raise RuntimeError("JWT_SECRET_KEY environment variable is required")
-
-JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = 24
+from .config import settings
+from .database.core import get_db
+from .models.rtl import TokenRevocationList
+from .schemas.token import TokenData
 
 security = HTTPBearer()
+
+async def get_current_active_user(
+    token: HTTPBearer = Depends(security),
+    db: AsyncSession = Depends(get_db)
+) -> TokenData:
+    """Validate JWT and check revocation list"""
+    try:
+        payload = jwt.decode(
+            token.credentials,
+            settings.jwt_secret_key,
+            algorithms=[settings.algorithm]
+        )
+        
+        # Check RTL
+        jti = payload.get("jti")
+        if jti:
+            from sqlalchemy import select
+            result = await db.execute(
+                select(TokenRevocationList).where(
+                    TokenRevocationList.jti == jti
+                )
+            )
+            if result.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token has been revoked"
+                )
+        
+        return TokenData(**payload)
+        
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token"
+        )
 
 def get_database_connection():
     """Get database connection"""
