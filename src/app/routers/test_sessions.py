@@ -17,7 +17,7 @@ from ..schemas.test_session import (
     TestSessionListResponse, OfflineBundleResponse
 )
 from ..dependencies import get_current_active_user
-from ..models import TokenData
+from ..schemas.auth import TokenPayload
 from ..utils.pagination import encode_cursor, decode_cursor, create_pagination_filter
 
 router = APIRouter(prefix="/v1/tests/sessions", tags=["test_sessions"])
@@ -27,7 +27,7 @@ router = APIRouter(prefix="/v1/tests/sessions", tags=["test_sessions"])
 async def create_test_session(
     session: TestSessionCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_active_user)
+    current_user: TokenPayload = Depends(get_current_active_user)
 ):
     """
     Create a new test session with CRDT initialization.
@@ -79,7 +79,7 @@ async def list_test_sessions(
     building_id: Optional[uuid.UUID] = Query(None, description="Filter by building ID"),
     status: Optional[str] = Query(None, description="Filter by session status"),
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_active_user)
+    current_user: TokenPayload = Depends(get_current_active_user)
 ):
     """
     List test sessions with cursor-based pagination.
@@ -143,7 +143,7 @@ async def list_test_sessions(
 async def get_test_session(
     session_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_active_user)
+    current_user: TokenPayload = Depends(get_current_active_user)
 ):
     """
     Get a specific test session by ID.
@@ -170,7 +170,7 @@ async def get_test_session(
 async def get_offline_bundle(
     session_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_active_user)
+    current_user: TokenPayload = Depends(get_current_active_user)
 ):
     """
     Generate offline bundle for test session.
@@ -241,7 +241,7 @@ async def update_test_session(
     session_id: uuid.UUID,
     session_update: TestSessionUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_active_user)
+    current_user: TokenPayload = Depends(get_current_active_user)
 ):
     """
     Update a test session with CRDT vector clock management.
@@ -286,7 +286,7 @@ async def update_test_session(
 async def delete_test_session(
     session_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_active_user)
+    current_user: TokenPayload = Depends(get_current_active_user)
 ):
     """
     Delete a test session and related data.

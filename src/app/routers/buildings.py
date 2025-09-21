@@ -16,7 +16,7 @@ from ..schemas.building import (
     BuildingCreate, BuildingRead, BuildingUpdate, BuildingListResponse
 )
 from ..dependencies import get_current_active_user
-from ..models import TokenData
+from ..schemas.auth import TokenPayload
 from ..utils.pagination import encode_cursor, decode_cursor, create_pagination_filter
 
 router = APIRouter(prefix="/v1/buildings", tags=["buildings"])
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/v1/buildings", tags=["buildings"])
 async def create_building(
     building: BuildingCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_active_user)
+    current_user: TokenPayload = Depends(get_current_active_user)
 ):
     """
     Create a new building with idempotency checks.
@@ -68,17 +68,7 @@ async def create_building(
     await db.refresh(db_building)
     
     # Return building with contract-compliant response
-    return BuildingRead(
-        building_id=db_building.id,
-        name=db_building.name,
-        address=db_building.address,
-        building_type=db_building.building_type,
-        compliance_status=db_building.compliance_status,
-        owner_id=db_building.owner_id,
-        created_at=db_building.created_at,
-        updated_at=db_building.updated_at,
-        status="active"
-    )
+    return BuildingRead.model_validate(db_building)
 
 
 @router.get("/", response_model=BuildingListResponse)
@@ -88,7 +78,7 @@ async def list_buildings(
     building_type: Optional[str] = Query(None, description="Filter by building type"),
     compliance_status: Optional[str] = Query(None, description="Filter by compliance status"),
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_active_user)
+    current_user: TokenPayload = Depends(get_current_active_user)
 ):
     """
     List buildings with cursor-based pagination and filtering.
@@ -166,7 +156,7 @@ async def list_buildings(
 async def get_building(
     building_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_active_user)
+    current_user: TokenPayload = Depends(get_current_active_user)
 ):
     """
     Get a specific building by ID.
@@ -206,7 +196,7 @@ async def update_building(
     building_id: uuid.UUID,
     building_update: BuildingUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_active_user)
+    current_user: TokenPayload = Depends(get_current_active_user)
 ):
     """
     Update a specific building.
@@ -255,7 +245,7 @@ async def update_building(
 async def delete_building(
     building_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_active_user)
+    current_user: TokenPayload = Depends(get_current_active_user)
 ):
     """
     Delete a specific building.

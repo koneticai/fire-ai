@@ -16,7 +16,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 # Import dependencies needed for authentication
 from .dependencies import get_current_active_user
-from .models import TokenData
+from .schemas.auth import TokenPayload
 from .internal_jwt import get_internal_jwt_token
 from .process_manager import get_go_service_manager
 
@@ -174,7 +174,7 @@ async def go_service_health():
 
 # Reverse proxy endpoints for Go service
 @app.post("/v1/evidence", tags=["Evidence"], summary="Submit Evidence", description="High-performance evidence submission endpoint (proxied to Go service)")
-async def proxy_evidence(request: Request, current_user: TokenData = Depends(get_current_active_user)):
+async def proxy_evidence(request: Request, current_user: TokenPayload = Depends(get_current_active_user)):
     """Reverse proxy for evidence endpoint to Go service with authentication"""
     if not go_service_client:
         raise HTTPException(status_code=503, detail="Performance service unavailable")
@@ -222,7 +222,7 @@ async def proxy_evidence(request: Request, current_user: TokenData = Depends(get
         raise HTTPException(status_code=503, detail="Performance service error")
 
 @app.post("/v1/tests/sessions/{session_id}/results", tags=["Evidence"], summary="Submit Test Results", description="High-performance test results submission endpoint (proxied to Go service)")
-async def proxy_test_results(session_id: str, request: Request, current_user: TokenData = Depends(get_current_active_user)):
+async def proxy_test_results(session_id: str, request: Request, current_user: TokenPayload = Depends(get_current_active_user)):
     """Reverse proxy for test results endpoint to Go service with authentication"""
     if not go_service_client:
         raise HTTPException(status_code=503, detail="Performance service unavailable")

@@ -24,13 +24,16 @@ name = "FireMode Backend"
 author = "agent"
 
 [workflows.workflow.metadata]
-outputType = "webview"
+outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python src/app/supervisor.py"
-waitForPort = 5000
+args = "export DATABASE_URL=\"postgresql://neondb_owner:npg_wl8kHoF3tusy@ep-small-tree-afyvcu0k.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require\" && export JWT_SECRET_KEY=\"63181718e4df31f152a20da4502d844b0ced3041a561480f2071321a4006c39e\" && export INTERNAL_JWT_SECRET_KEY=\"04379da581402f1892ad6360e74e7a1ae821d15f0103c8839721f4fc7f102d68\" && python src/app/supervisor.py"
 
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 9090
+externalPort = 3000

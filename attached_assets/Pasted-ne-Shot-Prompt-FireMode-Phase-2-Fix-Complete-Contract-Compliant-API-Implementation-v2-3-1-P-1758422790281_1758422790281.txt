@@ -1,0 +1,89 @@
+ne-Shot Prompt: FireMode Phase 2 Fix & Complete - Contract-Compliant API Implementation (v2.3)
+
+1. Primary Objective
+Fix all critical issues preventing startup and complete Phase 2 Task 2.1: Implement all API endpoints strictly adhering to v4.0 contract schemas with proper async operations, authentication, and integration with Phase 1 components.
+
+2. Critical Fixes Required
+
+Step 2.1: Fix Import Conflicts and Schema Issues
+```python
+# Fix src/app/schemas/auth.py - rename to avoid collision
+from pydantic import BaseModel
+import uuid
+from typing import Optional
+
+class TokenPayload(BaseModel):  # Renamed from TokenData
+    user_id: uuid.UUID
+    username: str
+    jti: Optional[uuid.UUID] = None
+    exp: Optional[int] = None
+
+# Fix src/app/schemas/building.py
+from pydantic import BaseModel, Field
+from typing import Optional
+import uuid
+from datetime import datetime
+
+class BuildingCreate(BaseModel):
+    site_name: str = Field(..., description="Building name")
+    site_address: str = Field(..., description="Building address")
+    metadata: Optional[dict] = Field(default={})
+
+class BuildingRead(BaseModel):
+    id: uuid.UUID = Field(..., alias="building_id")  # Fix duplicate aliasing
+    site_name: str
+    site_address: str
+    status: str = "active"
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True  # Allow both field name and alias
+Step 2.2: Fix Evidence Model Conflict
+python# Update src/app/models/evidence.py
+class Evidence(Base):
+    __tablename__ = 'evidence'
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id = Column(UUID(as_uuid=True), ForeignKey('test_sessions.id'))
+    file_hash = Column(String, nullable=False)
+    storage_path = Column(String, nullable=False)
+    evidence_metadata = Column(JSON, default={})  # Renamed from metadata
+    attestation_token = Column(String)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+Step 2.3: Fix Authentication Dependencies
+python# Update src/app/dependencies.py
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer
+from jose import JWTError, jwt
+from sqlalchemy.ext.asyncio import AsyncSession
+from .database.core import get_db
+from .schemas.auth import TokenPayload  # Use renamed schema
+import os
+
+security = HTTPBearer()
+
+async def get_current_active_user(
+    token: HTTPBearer = Depends(security),
+    db: AsyncSession = Depends(get_db)
+) -> TokenPayload:
+    secret_key = os.getenv("JWT_SECRET_KEY")
+    if not secret_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="JWT configuration error"
+        )
+    
+    try:
+        payload = jwt.decode(
+            token.credentials,
+            secret_key,
+            algorithms=["HS256"]
+        )
+        return TokenPayload(**payload)
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
