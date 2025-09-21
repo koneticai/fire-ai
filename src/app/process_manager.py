@@ -208,7 +208,7 @@ class GoServiceManager:
         """Perform health check on the Go service."""
         try:
             async with httpx.AsyncClient(timeout=self.health_check_timeout) as client:
-                response = await client.get("http://localhost:9090/health")
+                response = await client.get("http://localhost:9091/health")
                 return response.status_code == 200
         except Exception:
             return False

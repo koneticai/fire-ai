@@ -489,7 +489,7 @@ func main() {
         router.HandleFunc("/v1/tests/sessions/{session_id}/results", validateInternalJWT(handleCRDTResults)).Methods("POST")
 
         // Start server
-        port := ":9090"
+        port := ":9091"
         log.Printf("Go performance service starting on port %s", port)
 
         server := &http.Server{

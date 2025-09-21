@@ -65,7 +65,7 @@ async def lifespan(app: FastAPI):
             logger.info("Go service started successfully")
             
             # Create HTTP client for Go service
-            go_service_client = httpx.AsyncClient(base_url="http://localhost:9090")
+            go_service_client = httpx.AsyncClient(base_url="http://localhost:9091")
             
             # Set Go service client for classification router
             from .routers import classify

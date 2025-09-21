@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class GoServiceProxy:
     """Proxy for communicating with the embedded Go service."""
     
-    def __init__(self, base_url: str = "http://localhost:9090"):
+    def __init__(self, base_url: str = "http://localhost:9091"):
         self.base_url = base_url
         self.timeout = httpx.Timeout(30.0)  # 30 second timeout
         

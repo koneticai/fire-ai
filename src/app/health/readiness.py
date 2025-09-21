@@ -48,7 +48,7 @@ async def readiness_check():
     # Check Go service health
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get("http://localhost:9090/health", timeout=2)
+            response = await client.get("http://localhost:9091/health", timeout=2)
             checks["go_service"] = response.status_code == 200
             details["go_service"] = {
                 "status": response.status_code,

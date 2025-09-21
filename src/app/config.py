@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     PII_ENCRYPTION_KEY: str = os.getenv("PII_ENCRYPTION_KEY", secrets.token_urlsafe(32))
     
     # Go Service
-    GO_SERVICE_URL: str = "http://localhost:9090"
+    GO_SERVICE_URL: str = "http://localhost:9091"
     
     class Config:
         env_file = ".env"
