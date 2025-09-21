@@ -3,28 +3,37 @@ Configuration settings for FireMode Compliance Platform
 """
 
 import os
-import secrets
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    """Application settings with environment variable support"""
-    
-    # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+    """Application settings with environment variable support and validation"""
     
     # JWT Configuration
-    SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))
-    INTERNAL_JWT_SECRET_KEY: str = os.getenv("INTERNAL_JWT_SECRET_KEY", secrets.token_urlsafe(32))
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    jwt_secret_key: str = os.getenv("JWT_SECRET_KEY", "")
+    internal_jwt_secret_key: str = os.getenv("INTERNAL_JWT_SECRET_KEY", "")
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    
+    # Database
+    database_url: str = os.getenv("DATABASE_URL", "")
     
     # PII Encryption
-    PII_ENCRYPTION_KEY: str = os.getenv("PII_ENCRYPTION_KEY", secrets.token_urlsafe(32))
+    pii_encryption_key: str = os.getenv("PII_ENCRYPTION_KEY", "")
     
     # Go Service
-    GO_SERVICE_URL: str = "http://localhost:9091"
+    go_service_url: str = "http://localhost:9091"
     
     class Config:
         env_file = ".env"
+        
+    def validate_secrets(self):
+        """Fail fast if critical secrets are not configured"""
+        if not self.jwt_secret_key:
+            raise ValueError("JWT_SECRET_KEY not configured in secrets")
+        if not self.internal_jwt_secret_key:
+            raise ValueError("INTERNAL_JWT_SECRET_KEY not configured in secrets")
+        if not self.database_url:
+            raise ValueError("DATABASE_URL not configured in secrets")
 
 settings = Settings()
+settings.validate_secrets()
