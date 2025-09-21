@@ -24,12 +24,12 @@ async def test_error_format_compliance():
 
 
 @pytest.mark.asyncio
-async def test_pagination_contract():
+async def test_pagination_contract(auth_headers):
     """Test that pagination responses follow the contract specification"""
     async with AsyncClient(app=app, base_url="http://test") as client:
         response = await client.get(
             "/v1/tests/sessions",
-            headers={"Authorization": "Bearer test-token"}
+            headers=auth_headers
         )
         data = response.json()
         
@@ -40,12 +40,12 @@ async def test_pagination_contract():
 
 
 @pytest.mark.asyncio
-async def test_buildings_contract():
+async def test_buildings_contract(auth_headers):
     """Test buildings API contract compliance"""
     async with AsyncClient(app=app, base_url="http://test") as client:
         response = await client.get(
             "/v1/buildings",
-            headers={"Authorization": "Bearer test-token"}
+            headers=auth_headers
         )
         
         if response.status_code == 200:
@@ -61,12 +61,12 @@ async def test_buildings_contract():
 
 
 @pytest.mark.asyncio
-async def test_test_sessions_contract():
+async def test_test_sessions_contract(auth_headers):
     """Test test sessions API contract compliance"""
     async with AsyncClient(app=app, base_url="http://test") as client:
         response = await client.get(
             "/v1/tests/sessions",
-            headers={"Authorization": "Bearer test-token"}
+            headers=auth_headers
         )
         
         if response.status_code == 200:

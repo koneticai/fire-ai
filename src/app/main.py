@@ -316,6 +316,7 @@ from .routers import tests, rules, auth, rules_versioned, classify, users, evide
 # Add standardized error handling
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 import uuid
 
 async def error_handler(request: Request, exc: HTTPException):
@@ -346,7 +347,21 @@ async def error_handler(request: Request, exc: HTTPException):
         }
     )
 
+async def global_404_handler(request: Request, exc: StarletteHTTPException):
+    """Global 404 handler for FIRE error format compliance"""
+    return JSONResponse(
+        status_code=404,
+        content={
+            "transaction_id": str(uuid.uuid4()),
+            "error_code": "FIRE-404",
+            "message": "Not Found: Resource does not exist",
+            "retryable": True
+        }
+    )
+
+# Add exception handlers
 app.add_exception_handler(HTTPException, error_handler)
+app.add_exception_handler(404, global_404_handler)
 
 # Include API routers
 app.include_router(auth.router, prefix="/v1/auth")

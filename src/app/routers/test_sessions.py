@@ -67,21 +67,27 @@ async def list_test_sessions(
     next_cursor = None
     if has_more and sessions:
         last_session = sessions[-1]
-        next_cursor = encode_cursor({
-            "id": last_session.id,
-            "vector_clock": last_session.vector_clock,
-            "created_at": last_session.created_at.isoformat()
-        })
+        try:
+            created_at = getattr(last_session, 'created_at', datetime.utcnow())
+            created_at_str = created_at.isoformat() if hasattr(created_at, 'isoformat') else str(created_at)
+            next_cursor = encode_cursor({
+                "id": getattr(last_session, 'id', ''),
+                "vector_clock": getattr(last_session, 'vector_clock', {}),
+                "created_at": created_at_str
+            })
+        except Exception as e:
+            logger.warning(f"Failed to generate cursor: {e}")
+            next_cursor = None
     
     return {
         "data": [
             {
                 "id": str(s.id),
-                "building_id": str(s.building_id),
-                "status": s.status,
-                "session_name": s.session_name,
-                "created_at": s.created_at.isoformat(),
-                "vector_clock": s.vector_clock or {}
+                "building_id": str(getattr(s, 'building_id', '')),
+                "status": getattr(s, 'status', 'active'),
+                "session_name": getattr(s, 'session_name', ''),
+                "created_at": getattr(s, 'created_at', datetime.utcnow()).isoformat() if hasattr(getattr(s, 'created_at', datetime.utcnow()), 'isoformat') else str(getattr(s, 'created_at', datetime.utcnow())),
+                "vector_clock": getattr(s, 'vector_clock', {}) or {}
             } for s in sessions
         ],
         "next_cursor": next_cursor

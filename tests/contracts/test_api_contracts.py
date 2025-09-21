@@ -10,7 +10,7 @@ from src.app.main import app
 
 
 @pytest.mark.asyncio
-async def test_building_creation_contract():
+async def test_building_creation_contract(auth_headers):
     """
     Test building creation endpoint matches TDD contract exactly.
     
@@ -28,7 +28,7 @@ async def test_building_creation_contract():
         response = await client.post(
             "/v1/buildings",
             json=test_building,
-            headers={"Authorization": "Bearer valid-test-token"}
+            headers=auth_headers
         )
         
         assert response.status_code == 201
@@ -53,7 +53,7 @@ async def test_building_creation_contract():
 
 
 @pytest.mark.asyncio
-async def test_building_list_pagination_contract():
+async def test_building_list_pagination_contract(auth_headers):
     """
     Test building list endpoint with cursor-based pagination.
     
@@ -62,7 +62,7 @@ async def test_building_list_pagination_contract():
     async with AsyncClient(app=app, base_url="http://test") as client:
         response = await client.get(
             "/v1/buildings?limit=10",
-            headers={"Authorization": "Bearer valid-test-token"}
+            headers=auth_headers
         )
         
         assert response.status_code == 200
@@ -82,7 +82,7 @@ async def test_building_list_pagination_contract():
 
 
 @pytest.mark.asyncio 
-async def test_test_session_creation_contract():
+async def test_test_session_creation_contract(auth_headers):
     """
     Test test session creation endpoint with CRDT initialization.
     
@@ -99,7 +99,7 @@ async def test_test_session_creation_contract():
         building_response = await client.post(
             "/v1/buildings",
             json=building_data,
-            headers={"Authorization": "Bearer valid-test-token"}
+            headers=auth_headers
         )
         
         building_id = building_response.json()["building_id"]
@@ -118,7 +118,7 @@ async def test_test_session_creation_contract():
         response = await client.post(
             "/v1/tests/sessions",
             json=session_data,
-            headers={"Authorization": "Bearer valid-test-token"}
+            headers=auth_headers
         )
         
         assert response.status_code == 201
@@ -143,7 +143,7 @@ async def test_test_session_creation_contract():
 
 
 @pytest.mark.asyncio
-async def test_offline_bundle_contract():
+async def test_offline_bundle_contract(auth_headers):
     """
     Test offline bundle generation for test sessions.
     
@@ -155,7 +155,7 @@ async def test_offline_bundle_contract():
         
         response = await client.get(
             f"/v1/tests/sessions/{session_id}/offline-bundle",
-            headers={"Authorization": "Bearer valid-test-token"}
+            headers=auth_headers
         )
         
         # Handle both success and not found cases
@@ -186,7 +186,7 @@ async def test_offline_bundle_contract():
 
 
 @pytest.mark.asyncio
-async def test_standardized_error_format():
+async def test_standardized_error_format(auth_headers):
     """
     Test standardized error response format across all endpoints.
     
@@ -196,7 +196,7 @@ async def test_standardized_error_format():
         # Test 404 error format
         response = await client.get(
             "/v1/buildings/non-existent-id",
-            headers={"Authorization": "Bearer valid-test-token"}
+            headers=auth_headers
         )
         
         if response.status_code == 404:
@@ -245,7 +245,7 @@ async def test_cursor_pagination_format():
 
 
 @pytest.mark.asyncio
-async def test_idempotency_compliance():
+async def test_idempotency_compliance(auth_headers):
     """
     Test idempotency behavior for building creation.
     
@@ -262,14 +262,14 @@ async def test_idempotency_compliance():
         response1 = await client.post(
             "/v1/buildings",
             json=building_data,
-            headers={"Authorization": "Bearer valid-test-token"}
+            headers=auth_headers
         )
         
         # Second creation (should detect duplicate)
         response2 = await client.post(
             "/v1/buildings",
             json=building_data,
-            headers={"Authorization": "Bearer valid-test-token"}
+            headers=auth_headers
         )
         
         # First should succeed
@@ -299,7 +299,7 @@ async def test_authentication_required():
 
 
 @pytest.mark.asyncio
-async def test_vector_clock_updates():
+async def test_vector_clock_updates(auth_headers):
     """
     Test CRDT vector clock updates in test sessions.
     
@@ -318,7 +318,7 @@ async def test_vector_clock_updates():
         response = await client.put(
             f"/v1/tests/sessions/{session_id}",
             json=update_data,
-            headers={"Authorization": "Bearer valid-test-token"}
+            headers=auth_headers
         )
         
         # Handle both success and not found cases
