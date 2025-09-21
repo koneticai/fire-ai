@@ -1,0 +1,7 @@
+# Test Commands Configuration for FireMode Compliance Platform
+# This file contains test command definitions that can be referenced for running various test suites
+
+[commands]
+test_contracts = "poetry run pytest tests/contracts/ -v"
+test_chaos = "poetry run python -m pytest tests/chaos/ -v"
+test_resilience = "poetry run locust -f tests/load/locustfile_resilient.py --headless -u 100 -r 10 --run-time 5m"

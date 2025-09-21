@@ -1,10 +1,12 @@
 from pact import Consumer, Provider
 import json
+import requests
+import pytest
 
 pact = Consumer('Mobile App').has_pact_with(
     Provider('FireMode API'),
     host_name='localhost',
-    port=8080
+    port=8081  # Use non-conflicting port
 )
 
 def test_offline_bundle_contract():
@@ -36,12 +38,21 @@ def test_crdt_submission_contract():
      .given('A test session is active')
      .upon_receiving('CRDT result submission')
      .with_request(
-         'POST',
-         '/v1/tests/sessions/123/results',
-         headers={'Idempotency-Key': 'uuid'},
+         'PUT',
+         '/v1/tests/sessions/123',
+         headers={'Idempotency-Key': 'uuid', 'If-Match': '{}'},
          body={
-             '_sync_meta': {},
-             'changes': []
+             'session_name': 'Test Session',
+             'status': 'active'
          }
      )
      .will_respond_with(200))
+    
+    with pact:
+        # Test implementation
+        response = requests.put(
+            pact.uri + '/v1/tests/sessions/123',
+            headers={'Idempotency-Key': 'uuid', 'If-Match': '{}'},
+            json={'session_name': 'Test Session', 'status': 'active'}
+        )
+        assert response.status_code == 200

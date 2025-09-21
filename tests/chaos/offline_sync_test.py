@@ -1,5 +1,6 @@
 import asyncio
-from chaos import experiment
+import pytest
+from httpx import AsyncClient
 from toxiproxy import Toxiproxy
 
 class OfflineSyncChaosTest:
@@ -20,8 +21,8 @@ class OfflineSyncChaosTest:
         # Add 20% packet loss
         self.proxy.add_toxic(
             name="packet_loss",
-            type="latency",
-            attributes={"probability": 0.2}
+            type="slow_close",
+            toxicity=0.2
         )
         
         # Attempt sync

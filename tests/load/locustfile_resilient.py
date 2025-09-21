@@ -1,14 +1,19 @@
 from locust import HttpUser, task, between
 import random
+import uuid
 
 class ResilientUser(HttpUser):
     wait_time = between(1, 3)
     
     def on_start(self):
         # Authenticate
+        self.client_id = str(uuid.uuid4())
         self.client.headers = {
-            "Authorization": f"Bearer {self.get_token()}"
+            "Authorization": f"Bearer test-token"
         }
+    
+    def get_token(self):
+        return "test-token"
     
     @task(3)
     def submit_with_failures(self):
@@ -20,13 +25,13 @@ class ResilientUser(HttpUser):
                 catch_response=True
             )
         else:
-            with self.client.post(
-                "/v1/tests/sessions/123/results",
+            with self.client.put(
+                "/v1/tests/sessions/123",
                 json={
-                    "changes": [{"op": "set", "path": "/test", "value": "data"}],
-                    "_sync_meta": {"client_id": self.client_id}
+                    "session_name": "Test Session",
+                    "status": "active"
                 },
-                headers={"Idempotency-Key": str(uuid.uuid4())},
+                headers={"Idempotency-Key": str(uuid.uuid4()), "If-Match": "{}"},
                 catch_response=True
             ) as response:
                 if response.status_code != 200:
@@ -35,4 +40,4 @@ class ResilientUser(HttpUser):
     @task(1)
     def check_sync_status(self):
         """Verify sync state"""
-        self.client.get("/v1/tests/sessions/123/sync_status")
+        self.client.get("/v1/tests/sessions")

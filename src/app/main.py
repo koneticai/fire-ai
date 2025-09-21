@@ -20,13 +20,15 @@ from .dependencies import get_current_active_user
 from .schemas.auth import TokenPayload
 from .internal_jwt import get_internal_jwt_token
 from .process_manager import get_go_service_manager
+from .utils.resilience import CircuitBreaker, retry_with_backoff, with_circuit_breaker
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global Go service client
+# Global Go service client and circuit breaker
 go_service_client = None
+go_service_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=30)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -201,12 +203,15 @@ async def proxy_evidence(request: Request, current_user: TokenPayload = Depends(
         if "idempotency-key" in original_headers:
             headers["Idempotency-Key"] = original_headers["idempotency-key"]
         
-        response = await go_service_client.post(
-            "/v1/evidence",
-            content=body,
-            headers=headers,
-            timeout=30.0
-        )
+        async def make_go_request():
+            return await go_service_client.post(
+                "/v1/evidence",
+                content=body,
+                headers=headers,
+                timeout=30.0
+            )
+        
+        response = await go_service_breaker.call(make_go_request)
         
         # Filter response headers to only include safe headers
         safe_headers = {
@@ -249,12 +254,15 @@ async def proxy_test_results(session_id: str, request: Request, current_user: To
         if "idempotency-key" in original_headers:
             headers["Idempotency-Key"] = original_headers["idempotency-key"]
         
-        response = await go_service_client.post(
-            f"/v1/tests/sessions/{session_id}/results",
-            content=body,
-            headers=headers,
-            timeout=30.0
-        )
+        async def make_go_request():
+            return await go_service_client.post(
+                f"/v1/tests/sessions/{session_id}/results",
+                content=body,
+                headers=headers,
+                timeout=30.0
+            )
+        
+        response = await go_service_breaker.call(make_go_request)
         
         # Filter response headers to only include safe headers
         safe_headers = {
