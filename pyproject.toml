@@ -25,6 +25,9 @@ opentelemetry-instrumentation-fastapi = "^0.58b0"
 asyncpg = "^0.30.0"
 
 [tool.poetry.group.dev.dependencies]
+pact-python = "^2.1.0"
+chaos-toolkit = "^1.15.0"
+toxiproxy-python = "^1.0.2"
 pytest = "^8.2.2"
 pytest-asyncio = "^0.21.0"
 locust = "2.28.0"

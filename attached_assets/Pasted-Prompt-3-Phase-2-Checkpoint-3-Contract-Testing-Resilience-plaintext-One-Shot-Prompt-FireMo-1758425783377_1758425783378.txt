@@ -1,0 +1,248 @@
+Prompt 3: Phase 2, Checkpoint 3 — Contract Testing & Resilience
+```plaintext
+One-Shot Prompt: FireMode Phase 2, Checkpoint 3 - Contract & Resilience Testing (v2.2)
+
+1. Primary Objective
+Implement Tasks 2.3 & 2.4: Pact contract testing covering 100% of API contracts and chaos engineering tests for offline sync workflow.
+
+2. Implementation Steps
+
+Step 3.1: Pact Contract Testing Setup
+Add to pyproject.toml:
+```toml
+[tool.poetry.group.dev.dependencies]
+pact-python = "^2.1.0"
+chaos-toolkit = "^1.15.0"
+toxiproxy-python = "^1.0.2"
+Step 3.2: Contract Definitions
+Create tests/contracts/pact_tests.py:
+pythonfrom pact import Consumer, Provider
+import json
+
+pact = Consumer('Mobile App').has_pact_with(
+    Provider('FireMode API'),
+    host_name='localhost',
+    port=8080
+)
+
+def test_offline_bundle_contract():
+    expected = {
+        "session_id": "uuid",
+        "timestamp": "ISO",
+        "data": {
+            "building": {},
+            "assets": [],
+            "prior_faults": []
+        }
+    }
+    
+    (pact
+     .given('A test session exists')
+     .upon_receiving('Request for offline bundle')
+     .with_request('GET', '/v1/tests/sessions/123/offline_bundle')
+     .will_respond_with(200, body=expected))
+    
+    with pact:
+        # Test implementation
+        response = requests.get(
+            pact.uri + '/v1/tests/sessions/123/offline_bundle'
+        )
+        assert response.json() == expected
+
+def test_crdt_submission_contract():
+    (pact
+     .given('A test session is active')
+     .upon_receiving('CRDT result submission')
+     .with_request(
+         'POST',
+         '/v1/tests/sessions/123/results',
+         headers={'Idempotency-Key': 'uuid'},
+         body={
+             '_sync_meta': {},
+             'changes': []
+         }
+     )
+     .will_respond_with(200))
+Step 3.3: Chaos Engineering Tests
+Create tests/chaos/offline_sync_test.py:
+pythonimport asyncio
+from chaos import experiment
+from toxiproxy import Toxiproxy
+
+class OfflineSyncChaosTest:
+    def __init__(self):
+        self.toxiproxy = Toxiproxy()
+        self.proxy = None
+    
+    async def setup(self):
+        """Create network proxy for chaos testing"""
+        self.proxy = self.toxiproxy.create(
+            name="firemode_api",
+            listen="127.0.0.1:18080",
+            upstream="127.0.0.1:8080"
+        )
+    
+    async def test_20_percent_packet_loss(self):
+        """TDD requirement: 20% packet drop resilience"""
+        # Add 20% packet loss
+        self.proxy.add_toxic(
+            name="packet_loss",
+            type="latency",
+            attributes={"probability": 0.2}
+        )
+        
+        # Attempt sync
+        client = AsyncClient(base_url="http://127.0.0.1:18080")
+        
+        # Queue multiple CRDT changes
+        changes = []
+        for i in range(100):
+            changes.append({
+                "op": "set",
+                "path": f"/items/{i}",
+                "value": f"test_{i}"
+            })
+        
+        # Submit with retries
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                response = await client.post(
+                    "/v1/tests/sessions/123/results",
+                    json={"changes": changes},
+                    timeout=30
+                )
+                if response.status_code == 200:
+                    break
+            except:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                else:
+                    raise
+        
+        # Verify all changes were applied
+        verify_response = await client.get("/v1/tests/sessions/123")
+        assert len(verify_response.json()["items"]) == 100
+    
+    async def test_network_partition(self):
+        """Test behavior during network split"""
+        # Create network partition
+        self.proxy.add_toxic(
+            name="timeout",
+            type="timeout",
+            attributes={"timeout": 0}
+        )
+        
+        # Verify local queueing works
+        # This would interact with the mobile client's offline queue
+        pass
+    
+    async def teardown(self):
+        if self.proxy:
+            self.proxy.destroy()
+Step 3.4: Resilience Patterns Implementation
+Create src/app/utils/resilience.py:
+pythonfrom typing import Callable, Any
+import asyncio
+from functools import wraps
+
+class CircuitBreaker:
+    def __init__(self, failure_threshold: int = 5, recovery_timeout: int = 60):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.failure_count = 0
+        self.last_failure_time = None
+        self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
+    
+    async def call(self, func: Callable, *args, **kwargs) -> Any:
+        if self.state == "OPEN":
+            if (asyncio.get_event_loop().time() - self.last_failure_time 
+                > self.recovery_timeout):
+                self.state = "HALF_OPEN"
+            else:
+                raise Exception("Circuit breaker is OPEN")
+        
+        try:
+            result = await func(*args, **kwargs)
+            if self.state == "HALF_OPEN":
+                self.state = "CLOSED"
+                self.failure_count = 0
+            return result
+        except Exception as e:
+            self.failure_count += 1
+            self.last_failure_time = asyncio.get_event_loop().time()
+            
+            if self.failure_count >= self.failure_threshold:
+                self.state = "OPEN"
+            raise e
+
+def with_circuit_breaker(breaker: CircuitBreaker):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            return await breaker.call(func, *args, **kwargs)
+        return wrapper
+    return decorator
+
+# Exponential backoff retry
+async def retry_with_backoff(
+    func: Callable,
+    max_retries: int = 5,
+    base_delay: float = 1.0,
+    max_delay: float = 300.0
+):
+    for attempt in range(max_retries):
+        try:
+            return await func()
+        except Exception as e:
+            if attempt == max_retries - 1:
+                raise
+            
+            delay = min(base_delay * (2 ** attempt), max_delay)
+            await asyncio.sleep(delay)
+Step 3.5: Load Testing with Resilience
+Create tests/load/locustfile_resilient.py:
+pythonfrom locust import HttpUser, task, between
+import random
+
+class ResilientUser(HttpUser):
+    wait_time = between(1, 3)
+    
+    def on_start(self):
+        # Authenticate
+        self.client.headers = {
+            "Authorization": f"Bearer {self.get_token()}"
+        }
+    
+    @task(3)
+    def submit_with_failures(self):
+        """Simulate intermittent failures"""
+        if random.random() < 0.1:  # 10% artificial failure
+            self.client.post(
+                "/v1/tests/sessions/invalid/results",
+                json={"changes": []},
+                catch_response=True
+            )
+        else:
+            with self.client.post(
+                "/v1/tests/sessions/123/results",
+                json={
+                    "changes": [{"op": "set", "path": "/test", "value": "data"}],
+                    "_sync_meta": {"client_id": self.client_id}
+                },
+                headers={"Idempotency-Key": str(uuid.uuid4())},
+                catch_response=True
+            ) as response:
+                if response.status_code != 200:
+                    response.failure(f"Got {response.status_code}")
+    
+    @task(1)
+    def check_sync_status(self):
+        """Verify sync state"""
+        self.client.get("/v1/tests/sessions/123/sync_status")
+Step 3.6: Run Tests Command
+Update .replit:
+toml[commands]
+test_contracts = "poetry run pytest tests/contracts/ -v"
+test_chaos = "poetry run python -m pytest tests/chaos/ -v"
+test_resilience = "poetry run locust -f tests/load/locustfile_resilient.py --headless -u 100 -r 10 --run-time 5m"
