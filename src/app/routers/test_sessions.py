@@ -16,79 +16,60 @@ from ..database.core import get_db
 from ..models.test_sessions import TestSession
 from ..dependencies import get_current_active_user
 from ..schemas.auth import TokenPayload
+from ..utils.pagination import encode_cursor, decode_cursor
+from ..utils.query_builder import QueryBuilder
+from ..utils.vector_clock import VectorClock
 
 router = APIRouter(prefix="/v1/tests/sessions", tags=["test_sessions"])
 
-@router.get("/")
+@router.get("/", response_model=Dict)
 async def list_test_sessions(
     limit: int = Query(20, ge=1, le=100),
-    cursor: Optional[str] = None,
+    cursor: Optional[str] = Query(None),
     status: Optional[List[str]] = Query(None),
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    technician_id: Optional[str] = None,
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    technician_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: TokenPayload = Depends(get_current_active_user)
+    current_user: Dict = Depends(get_current_active_user)
 ):
-    """
-    List test sessions with cursor-based pagination and filtering.
-    
-    Supports filtering by status, date range, and technician.
-    Returns paginated results with CRDT-aware cursor.
-    """
     # Decode cursor
-    cursor_data = {}
-    if cursor:
-        try:
-            cursor_data = json.loads(base64.b64decode(cursor))
-        except:
-            raise HTTPException(status_code=400, detail="Invalid cursor")
+    cursor_data = decode_cursor(cursor) if cursor else {}
     
-    # Build query
-    query = select(TestSession)
-    conditions = []
+    # Build query with filters
+    base_query = select(TestSession).where(
+        TestSession.created_by == current_user["user_id"]
+    )
     
-    if status:
-        conditions.append(TestSession.status.in_(status))
-    if date_from:
-        conditions.append(TestSession.created_at >= date_from)
-    if date_to:
-        conditions.append(TestSession.created_at <= date_to)
-    if cursor_data.get("last_evaluated_id"):
-        conditions.append(TestSession.id > cursor_data["last_evaluated_id"])
+    filters = {
+        k: v for k, v in {
+            "status": status,
+            "date_from": date_from,
+            "date_to": date_to,
+            "technician_id": technician_id
+        }.items() if v is not None
+    }
     
-    if conditions:
-        query = query.where(and_(*conditions))
-    
-    query = query.order_by(TestSession.created_at).limit(limit + 1)
+    query = QueryBuilder(base_query)\
+        .apply_filters(filters)\
+        .apply_cursor_pagination(cursor_data, limit)\
+        .build()
     
     result = await db.execute(query)
     sessions = result.scalars().all()
     
-    # Generate next cursor
+    # Generate next cursor if we have results
     next_cursor = None
-    if len(sessions) > limit:
-        sessions = sessions[:limit]
+    if sessions and len(sessions) == limit:
         last_session = sessions[-1]
-        cursor_data = {
-            "last_evaluated_id": str(last_session.id),
-            "vector_clock": last_session.vector_clock or {}
-        }
-        next_cursor = base64.b64encode(json.dumps(cursor_data).encode()).decode()
+        next_cursor = encode_cursor({
+            "id": last_session.id,
+            "vector_clock": last_session.vector_clock
+        })
     
     return {
-        "data": [
-            {
-                "session_id": str(s.id),
-                "building_id": str(s.building_id),
-                "status": s.status,
-                "session_name": s.session_name,
-                "created_at": s.created_at.isoformat(),
-                "vector_clock": s.vector_clock or {}
-            } for s in sessions
-        ],
-        "next_cursor": next_cursor,
-        "total": len(sessions)
+        "data": sessions,
+        "next_cursor": next_cursor
     }
 
 @router.get("/{session_id}/offline_bundle")
