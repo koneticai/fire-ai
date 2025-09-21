@@ -1,0 +1,63 @@
+Step 2.4: Concurrent Write Detection
+Create src/app/middleware/concurrency.py:
+pythonfrom fastapi import Request, HTTPException
+from ..utils.vector_clock import VectorClock
+
+async def detect_concurrent_writes(request: Request, call_next):
+    """Middleware to detect concurrent modifications using vector clocks"""
+    if request.method in ["PUT", "PATCH", "DELETE"]:
+        if_match = request.headers.get("If-Match")
+        if if_match:
+            # Parse vector clock from ETag
+            try:
+                client_clock = VectorClock.from_json(if_match)
+                request.state.vector_clock = client_clock
+            except:
+                raise HTTPException(
+                    status_code=412,
+                    detail="Invalid vector clock in If-Match header"
+                )
+    
+    response = await call_next(request)
+    
+    # Add vector clock to response if present
+    if hasattr(request.state, "updated_clock"):
+        response.headers["ETag"] = request.state.updated_clock.to_json()
+    
+    return response
+Step 2.5: Integration Tests
+Create tests/integration/test_pagination.py:
+python@pytest.mark.asyncio
+async def test_vector_clock_pagination_consistency():
+    """Test pagination handles concurrent writes correctly"""
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        # Create multiple sessions concurrently
+        tasks = []
+        for i in range(50):
+            tasks.append(
+                client.post("/v1/tests/sessions", 
+                json={"building_id": str(uuid.uuid4())})
+            )
+        
+        await asyncio.gather(*tasks)
+        
+        # Paginate through results
+        all_items = []
+        cursor = None
+        
+        while True:
+            params = {"limit": 10}
+            if cursor:
+                params["cursor"] = cursor
+            
+            response = await client.get("/v1/tests/sessions", params=params)
+            data = response.json()
+            all_items.extend(data["data"])
+            
+            if not data.get("next_cursor"):
+                break
+            cursor = data["next_cursor"]
+        
+        # Verify no duplicates despite concurrent writes
+        ids = [item["id"] for item in all_items]
+        assert len(ids) == len(set(ids))

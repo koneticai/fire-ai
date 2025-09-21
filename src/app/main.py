@@ -132,6 +132,10 @@ app = FastAPI(
 # Configure OpenTelemetry
 FastAPIInstrumentor.instrument_app(app)
 
+# Add concurrency middleware for vector clock detection
+from .middleware.concurrency import detect_concurrent_writes
+app.middleware("http")(detect_concurrent_writes)
+
 # Root endpoint
 @app.get("/", tags=["Health"])
 async def root():
