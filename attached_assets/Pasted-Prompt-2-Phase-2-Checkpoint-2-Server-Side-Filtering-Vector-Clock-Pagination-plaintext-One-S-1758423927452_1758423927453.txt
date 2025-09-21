@@ -1,0 +1,216 @@
+Prompt 2: Phase 2, Checkpoint 2 — Server-Side Filtering & Vector Clock Pagination
+```plaintext
+One-Shot Prompt: FireMode Phase 2, Checkpoint 2 - Advanced Pagination & Filtering (v2.2)
+
+1. Primary Objective
+Implement Task 2.2: Server-side filtering and vector-clock-based pagination for all list endpoints, handling concurrent writes per TDD requirements.
+
+2. Implementation Steps
+
+Step 2.1: Vector Clock Implementation
+Create src/app/utils/vector_clock.py:
+```python
+from typing import Dict, List, Any
+import json
+
+class VectorClock:
+    def __init__(self, clock: Dict[str, int] = None):
+        self.clock = clock or {}
+    
+    def increment(self, node_id: str) -> None:
+        """Increment vector clock for a node"""
+        self.clock[node_id] = self.clock.get(node_id, 0) + 1
+    
+    def merge(self, other: 'VectorClock') -> 'VectorClock':
+        """Merge two vector clocks, taking max of each component"""
+        merged = VectorClock()
+        all_nodes = set(self.clock.keys()) | set(other.clock.keys())
+        for node in all_nodes:
+            merged.clock[node] = max(
+                self.clock.get(node, 0),
+                other.clock.get(node, 0)
+            )
+        return merged
+    
+    def happens_before(self, other: 'VectorClock') -> bool:
+        """Check if this clock happens-before another"""
+        for node, value in self.clock.items():
+            if value > other.clock.get(node, 0):
+                return False
+        return True
+    
+    def to_json(self) -> str:
+        return json.dumps(self.clock)
+    
+    @classmethod
+    def from_json(cls, data: str) -> 'VectorClock':
+        return cls(json.loads(data))
+Step 2.2: Advanced Query Builder
+Create src/app/utils/query_builder.py:
+pythonfrom sqlalchemy import select, and_, or_
+from sqlalchemy.sql import Select
+from typing import Dict, Any, Optional
+from datetime import datetime
+
+class QueryBuilder:
+    def __init__(self, base_query: Select):
+        self.query = base_query
+    
+    def apply_filters(self, filters: Dict[str, Any]) -> 'QueryBuilder':
+        """Apply TDD-compliant filtering"""
+        if "status" in filters:
+            self.query = self.query.where(
+                self.query.selected_columns[0].status.in_(filters["status"])
+            )
+        
+        if "date_from" in filters:
+            self.query = self.query.where(
+                self.query.selected_columns[0].created_at >= filters["date_from"]
+            )
+        
+        if "date_to" in filters:
+            self.query = self.query.where(
+                self.query.selected_columns[0].created_at <= filters["date_to"]
+            )
+        
+        return self
+    
+    def apply_cursor_pagination(
+        self, 
+        cursor_data: Dict[str, Any],
+        limit: int = 20
+    ) -> 'QueryBuilder':
+        """Apply vector-clock aware pagination"""
+        if "last_evaluated_id" in cursor_data:
+            # Continue from last position
+            self.query = self.query.where(
+                self.query.selected_columns[0].id > cursor_data["last_evaluated_id"]
+            )
+        
+        self.query = self.query.limit(limit)
+        return self
+    
+    def build(self) -> Select:
+        return self.query
+Step 2.3: Update Test Sessions Router
+Update src/app/routers/test_sessions.py:
+pythonfrom fastapi import APIRouter, Depends, Query
+from typing import Optional, Dict, List
+from ..utils.pagination import encode_cursor, decode_cursor
+from ..utils.query_builder import QueryBuilder
+from ..utils.vector_clock import VectorClock
+
+router = APIRouter(prefix="/v1/tests/sessions", tags=["test_sessions"])
+
+@router.get("/", response_model=Dict)
+async def list_test_sessions(
+    limit: int = Query(20, ge=1, le=100),
+    cursor: Optional[str] = Query(None),
+    status: Optional[List[str]] = Query(None),
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    technician_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: Dict = Depends(get_current_active_user)
+):
+    # Decode cursor
+    cursor_data = decode_cursor(cursor) if cursor else {}
+    
+    # Build query with filters
+    base_query = select(TestSession).where(
+        TestSession.created_by == current_user["user_id"]
+    )
+    
+    filters = {
+        k: v for k, v in {
+            "status": status,
+            "date_from": date_from,
+            "date_to": date_to,
+            "technician_id": technician_id
+        }.items() if v is not None
+    }
+    
+    query = QueryBuilder(base_query)\
+        .apply_filters(filters)\
+        .apply_cursor_pagination(cursor_data, limit)\
+        .build()
+    
+    result = await db.execute(query)
+    sessions = result.scalars().all()
+    
+    # Generate next cursor if we have results
+    next_cursor = None
+    if sessions and len(sessions) == limit:
+        last_session = sessions[-1]
+        next_cursor = encode_cursor({
+            "id": last_session.id,
+            "vector_clock": last_session.vector_clock
+        })
+    
+    return {
+        "data": sessions,
+        "next_cursor": next_cursor
+    }
+Step 2.4: Concurrent Write Detection
+Create src/app/middleware/concurrency.py:
+pythonfrom fastapi import Request, HTTPException
+from ..utils.vector_clock import VectorClock
+
+async def detect_concurrent_writes(request: Request, call_next):
+    """Middleware to detect concurrent modifications using vector clocks"""
+    if request.method in ["PUT", "PATCH", "DELETE"]:
+        if_match = request.headers.get("If-Match")
+        if if_match:
+            # Parse vector clock from ETag
+            try:
+                client_clock = VectorClock.from_json(if_match)
+                request.state.vector_clock = client_clock
+            except:
+                raise HTTPException(
+                    status_code=412,
+                    detail="Invalid vector clock in If-Match header"
+                )
+    
+    response = await call_next(request)
+    
+    # Add vector clock to response if present
+    if hasattr(request.state, "updated_clock"):
+        response.headers["ETag"] = request.state.updated_clock.to_json()
+    
+    return response
+Step 2.5: Integration Tests
+Create tests/integration/test_pagination.py:
+python@pytest.mark.asyncio
+async def test_vector_clock_pagination_consistency():
+    """Test pagination handles concurrent writes correctly"""
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        # Create multiple sessions concurrently
+        tasks = []
+        for i in range(50):
+            tasks.append(
+                client.post("/v1/tests/sessions", 
+                json={"building_id": str(uuid.uuid4())})
+            )
+        
+        await asyncio.gather(*tasks)
+        
+        # Paginate through results
+        all_items = []
+        cursor = None
+        
+        while True:
+            params = {"limit": 10}
+            if cursor:
+                params["cursor"] = cursor
+            
+            response = await client.get("/v1/tests/sessions", params=params)
+            data = response.json()
+            all_items.extend(data["data"])
+            
+            if not data.get("next_cursor"):
+                break
+            cursor = data["next_cursor"]
+        
+        # Verify no duplicates despite concurrent writes
+        ids = [item["id"] for item in all_items]
+        assert len(ids) == len(set(ids))
