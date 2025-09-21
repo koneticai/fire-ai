@@ -1,0 +1,18 @@
+# Deployment Configuration for FireMode Compliance Platform
+# This file contains deployment settings that can be referenced for production deployment
+
+[deployment]
+run = ["sh", "-c", "source .env && poetry run alembic upgrade head && poetry run python src/app/supervisor.py"]
+
+[commands]
+test = "poetry run pytest tests/ -v"
+start = "source .env && poetry run python src/app/supervisor.py"
+build = "poetry install --no-dev"
+
+[env]
+PYTHONPATH = "${REPL_HOME}"
+
+[requirements]
+python_version = "3.11"
+poetry = true
+database_migrations = true
