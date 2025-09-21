@@ -42,10 +42,24 @@ class QueryBuilder:
         self.query = self.query.order_by(self.model.created_at, self.model.id)
         
         if "last_evaluated_id" in cursor_data:
-            # Continue from last position using keyset pagination
-            self.query = self.query.where(
-                self.model.id > cursor_data["last_evaluated_id"]
-            )
+            # Composite keyset pagination using (created_at, id)
+            if "created_at" in cursor_data and cursor_data["created_at"]:
+                from datetime import datetime
+                cursor_created_at = datetime.fromisoformat(cursor_data["created_at"])
+                self.query = self.query.where(
+                    or_(
+                        self.model.created_at > cursor_created_at,
+                        and_(
+                            self.model.created_at == cursor_created_at,
+                            self.model.id > cursor_data["last_evaluated_id"]
+                        )
+                    )
+                )
+            else:
+                # Fallback to ID-only keyset
+                self.query = self.query.where(
+                    self.model.id > cursor_data["last_evaluated_id"]
+                )
         
         # Fetch limit+1 to detect if there are more results
         self.query = self.query.limit(limit + 1)

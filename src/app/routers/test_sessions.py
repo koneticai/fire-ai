@@ -3,7 +3,7 @@ Test Sessions API Router for FireMode Compliance Platform
 Complete implementation with cursor-based pagination and offline bundle generation
 """
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from typing import Optional, List, Dict
@@ -76,7 +76,7 @@ async def list_test_sessions(
     return {
         "data": [
             {
-                "session_id": str(s.id),
+                "id": str(s.id),
                 "building_id": str(s.building_id),
                 "status": s.status,
                 "session_name": s.session_name,
@@ -184,10 +184,11 @@ async def create_test_session(
 async def update_test_session(
     session_id: str,
     updates: dict,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_active_user)
 ):
-    """Update test session with CRDT vector clock increment"""
+    """Update test session with CRDT vector clock increment and optimistic concurrency control"""
     
     result = await db.execute(
         select(TestSession).where(TestSession.id == session_id)
@@ -197,10 +198,34 @@ async def update_test_session(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    # Update vector clock for CRDT
-    current_clock = session.vector_clock if session.vector_clock is not None else {}
-    user_id = str(current_user.user_id)
-    current_clock[user_id] = current_clock.get(user_id, 0) + 1
+    # Optimistic Concurrency Control using vector clocks
+    server_clock = VectorClock(session.vector_clock or {})
+    
+    if hasattr(request.state, "vector_clock"):
+        client_clock = request.state.vector_clock
+        
+        # Check if client clock happens-before server clock (stale client)
+        if client_clock.happens_before(server_clock) or (
+            client_clock.clock != server_clock.clock and 
+            not server_clock.happens_before(client_clock)
+        ):
+            raise HTTPException(
+                status_code=412, 
+                detail="Concurrent modification detected. Please refresh and try again."
+            )
+        
+        # Merge client knowledge into server clock
+        server_clock = server_clock.merge(client_clock)
+    else:
+        # Require If-Match header for OCC enforcement
+        raise HTTPException(
+            status_code=428,
+            detail="Precondition Required: If-Match header with vector clock required"
+        )
+    
+    # Increment vector clock for CRDT
+    user_id = str(current_user.user_id) 
+    server_clock.increment(user_id)
     
     # Apply updates
     if "session_name" in updates:
@@ -210,8 +235,11 @@ async def update_test_session(
     if "session_data" in updates:
         session.session_data = updates["session_data"]
     
-    session.vector_clock = current_clock
+    session.vector_clock = server_clock.clock
     session.updated_at = datetime.utcnow()
+    
+    # Set updated clock for ETag response
+    request.state.updated_clock = server_clock
     
     await db.commit()
     await db.refresh(session)
