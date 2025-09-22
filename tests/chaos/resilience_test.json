@@ -1,0 +1,19 @@
+{
+    "version": "1.0.0",
+    "title": "TDD Task 2.4: Validate API Availability",
+    "description": "Ensures the FireMode API remains healthy and responsive.",
+    "method": [
+        {
+            "type": "probe",
+            "name": "api-is-healthy",
+            "provider": {
+                "type": "python",
+                "module": "chaoshumio.probes",
+                "func": "ensure_service_is_healthy",
+                "arguments": {
+                    "url": "http://localhost:5000/health/ready"
+                }
+            }
+        }
+    ]
+}
