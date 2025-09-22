@@ -1,0 +1,84 @@
+1. Primary Objective
+Achieve a 100% pass rate across all test suites by fixing the specific mocking and configuration issues in the failing Pact and Chaos tests. Successful execution of the final validation script is the sole acceptance criterion for completing Phase 2.
+
+2. Step 1: Fix the Pact Contract Test
+The Pact test is failing because it's incorrectly concerned with live authentication. A contract test should validate the request/response structure, assuming a valid user state. We will fix this by focusing the test exclusively on the contract.
+
+A. Update tests/test_pact_contract.py:
+Replace the contents of this file with the corrected version below. This version properly defines the provider state and focuses only on the API contract.
+
+Python
+# tests/test_pact_contract.py
+import pytest
+import requests
+from pact import Consumer, Provider, Like
+
+pact = Consumer('FireMode-MobileApp').has_pact_with(Provider('FireMode-API'), port=8000)
+
+@pytest.fixture(scope="session")
+def pact_session():
+    pact.start_service()
+    yield
+    pact.stop_service()
+
+def test_get_offline_bundle_contract(pact_session):
+    """TDD Task 2.3: Validates the contract, assuming an authenticated state."""
+    expected_body = {
+        "session_id": Like("123e4567-e89b-12d3-a456-426614174000"),
+        "building_id": Like("building-abc-123"),
+        "status": Like("in_progress")
+    }
+
+    (pact
+     # The 'given' state tells the provider how to set up the mock.
+     .given('An authenticated user requests a test session that exists')
+     .upon_receiving('a request for an offline bundle')
+     .with_request(
+         method='GET',
+         path='/v1/tests/sessions/123e4567-e89b-12d3-a456-426614174000/offline_bundle',
+         headers={'Authorization': 'Bearer any-valid-token'} # The token itself doesn't matter here
+     )
+     .will_respond_with(200, body=expected_body))
+
+    with pact:
+        # We now test against the Pact mock server, which enforces the contract.
+        response = requests.get(
+            pact.uri + '/v1/tests/sessions/123e4567-e89b-12d3-a456-426614174000/offline_bundle',
+            headers={'Authorization': 'Bearer any-valid-token'}
+        )
+        assert response.status_code == 200
+3. Step 2: Fix the Chaos Resilience Test
+The Chaos test is failing because its HTTP probe does not include the necessary (mocked) authentication header, causing a 401 Unauthorized error instead of probing the target endpoint's resilience.
+
+A. Update tests/chaos/resilience_test.json:
+Add a headers block to the HTTP probe to ensure it can pass through the authentication layer during testing.
+
+JSON
+{
+    "version": "1.0.0",
+    "title": "TDD Task 2.4: Validate API Availability",
+    "description": "Ensures the FireMode API remains healthy and responsive.",
+    "method": [
+        {
+            "type": "probe",
+            "name": "api-is-healthy",
+            "provider": {
+                "type": "python",
+                "module": "chaoshumio.probes",
+                "func": "ensure_service_is_healthy",
+                "arguments": {
+                    "url": "http://localhost:8000/health/ready",
+                    "headers": {
+                        "Authorization": "Bearer mock-test-token"
+                    }
+                }
+            }
+        }
+    ]
+}
+4. Step 3: The Final Validation
+With these fixes, all three test suites should now pass. Execute the unified validation script. This is the final gate for Phase 2.
+Execute the master validation script in the Shell:
+Bash
+./scripts/validate_phase2.sh
+A complete, error-free run of this script from top to bottom is the only acceptable result. Upon its success, I will formally confirm the completion of Phase 2, and we can architect the handoff to Phase 3.

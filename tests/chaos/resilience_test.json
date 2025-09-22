@@ -11,7 +11,10 @@
                 "module": "chaoshumio.probes",
                 "func": "ensure_service_is_healthy",
                 "arguments": {
-                    "url": "http://localhost:5000/health/ready"
+                    "url": "http://localhost:8000/health/ready",
+                    "headers": {
+                        "Authorization": "Bearer mock-test-token"
+                    }
                 }
             }
         }
