@@ -5,114 +5,62 @@ This module provides common test fixtures and configuration for the test suite.
 """
 
 import pytest
+from unittest.mock import AsyncMock, MagicMock
+from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
 import asyncio
 import os
-import uuid
-from typing import Generator
-from unittest.mock import AsyncMock, Mock, patch
 
-# Set test environment variables
-os.environ["INTERNAL_JWT_SECRET_KEY"] = "test_secret_key_for_internal_jwt_testing"
-os.environ["JWT_SECRET_KEY"] = "test_jwt_secret_key_for_testing_authentication"
-os.environ["DATABASE_URL"] = "postgresql://test_user:test_password@localhost:5432/test_firemode"
+# Set test environment
+os.environ["TESTING"] = "true"
+os.environ["JWT_SECRET_KEY"] = "test-secret-key"
+os.environ["INTERNAL_JWT_SECRET_KEY"] = "test-internal-key"
 
 
 @pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    """Create an instance of the default event loop for the test session."""
+def event_loop():
+    """Create event loop for async tests."""
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
 
+@pytest.fixture
+async def async_session():
+    """Mock async database session."""
+    session = AsyncMock(spec=AsyncSession)
+    
+    # Mock query results for pagination tests
+    mock_result = MagicMock()
+    mock_result.scalars.return_value.all.return_value = []
+    mock_result.scalar.return_value = 0
+    
+    session.execute = AsyncMock(return_value=mock_result)
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    
+    return session
 
 @pytest.fixture
-def test_user_id() -> str:
-    """Provide a test user ID for tests."""
-    return "550e8400-e29b-41d4-a716-446655440000"
-
-
-@pytest.fixture
-def test_token_id() -> str:
-    """Provide a test token ID for tests."""
-    return "test_token_abcdef123456"
-
+def override_get_current_user():
+    """Override authentication for tests."""
+    async def mock_user():
+        return {"user_id": "test-user", "email": "test@example.com"}
+    return mock_user
 
 @pytest.fixture
-def test_user_data(test_user_id: str) -> dict:
-    """Provide test user data for token creation."""
-    return {
-        "sub": "testuser",
-        "user_id": test_user_id,
-        "username": "testuser"
-    }
-
-
-@pytest.fixture
-def valid_jwt_token(test_user_data: dict) -> str:
-    """Create a valid JWT token for testing."""
-    from src.app.dependencies import create_access_token
-    return create_access_token(test_user_data)
-
-
-@pytest.fixture
-def auth_headers(valid_jwt_token: str) -> dict:
-    """Create authentication headers with valid JWT token."""
-    return {"Authorization": f"Bearer {valid_jwt_token}"}
-
-
-@pytest.fixture
-def mock_db_session():
-    """Mock database session for testing."""
-    mock_session = AsyncMock()
-    mock_session.execute = AsyncMock()
-    mock_session.commit = AsyncMock()
-    mock_session.refresh = AsyncMock()
-    mock_session.add = Mock()
-    return mock_session
-
-
-async def override_get_current_active_user():
-    """A mock dependency that provides a consistent test user."""
-    from src.app.schemas.auth import TokenPayload
-    return TokenPayload(
-        user_id=uuid.UUID("550e8400-e29b-41d4-a716-446655440000"), 
-        username="testuser@example.com",
-        jti=uuid.uuid4(),
-        exp=None
-    )
-
-# Apply the override to the FastAPI application for all tests
-@pytest.fixture(autouse=True)
-def setup_auth_override():
-    """Set up authentication override for all tests."""
+def client(override_get_current_user, async_session):
+    """Test client with mocked dependencies."""
     from src.app.main import app
     from src.app.dependencies import get_current_active_user
-    
-    app.dependency_overrides[get_current_active_user] = override_get_current_active_user
-    yield
-    # Clean up is handled by mock_database_dependencies
-
-
-@pytest.fixture(autouse=True)
-def mock_database_dependencies():
-    """Mock database connection for all tests using FastAPI dependency overrides."""
-    from src.app.main import app
     from src.app.database.core import get_db
     
-    mock_session = AsyncMock()
-    mock_session.execute = AsyncMock()
-    mock_session.commit = AsyncMock()
-    mock_session.refresh = AsyncMock()
-    mock_session.add = Mock()
+    app.dependency_overrides[get_current_active_user] = override_get_current_user
+    app.dependency_overrides[get_db] = lambda: async_session
     
-    # Use FastAPI dependency_overrides instead of patch
-    async def override_get_db():
-        yield mock_session
-    
-    # Override the dependency properly
-    app.dependency_overrides[get_db] = override_get_db
-    
-    yield mock_session
-    
-    # Clean up dependency override
-    app.dependency_overrides.clear()
+    return TestClient(app)
+
+@pytest.fixture
+def authenticated_headers():
+    """Headers with valid test token."""
+    return {"Authorization": "Bearer test-token"}
