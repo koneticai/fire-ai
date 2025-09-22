@@ -26,7 +26,7 @@ def event_loop():
     loop.close()
 
 @pytest.fixture
-async def async_session():
+def async_session():
     """Mock async database session."""
     session = AsyncMock(spec=AsyncSession)
     
@@ -44,8 +44,14 @@ async def async_session():
 @pytest.fixture
 def override_get_current_user():
     """Override authentication for tests."""
+    import types
     async def mock_user():
-        return {"user_id": "test-user", "email": "test@example.com"}
+        # Return object with .id attribute to match app expectations
+        return types.SimpleNamespace(
+            id="test-user",
+            user_id="test-user", 
+            email="test@example.com"
+        )
     return mock_user
 
 @pytest.fixture
@@ -56,7 +62,12 @@ def client(override_get_current_user, async_session):
     from src.app.database.core import get_db
     
     app.dependency_overrides[get_current_active_user] = override_get_current_user
-    app.dependency_overrides[get_db] = lambda: async_session
+    
+    # Fix async session dependency override
+    async def override_get_db():
+        yield async_session
+    
+    app.dependency_overrides[get_db] = override_get_db
     
     return TestClient(app)
 
