@@ -3,37 +3,42 @@ Configuration settings for FireMode Compliance Platform
 """
 
 import os
+import sys
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    """Application settings with environment variable support and validation"""
+    # Required secrets - no defaults allowed
+    jwt_secret_key: str
+    internal_jwt_secret_key: str
+    database_url: str
     
-    # JWT Configuration
-    jwt_secret_key: str = os.getenv("JWT_SECRET_KEY", "")
-    internal_jwt_secret_key: str = os.getenv("INTERNAL_JWT_SECRET_KEY", "")
+    # Configuration
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     
-    # Database
-    database_url: str = os.getenv("DATABASE_URL", "")
-    
-    # PII Encryption
-    pii_encryption_key: str = os.getenv("PII_ENCRYPTION_KEY", "")
-    
-    # Go Service
-    go_service_url: str = "http://localhost:9091"
-    
     class Config:
-        env_file = ".env"
+        # Do NOT use .env file in production
+        env_file = None
+    
+    @classmethod
+    def load_and_validate(cls):
+        """Load settings and fail fast if secrets missing"""
+        instance = cls(
+            jwt_secret_key=os.getenv("JWT_SECRET_KEY", ""),
+            internal_jwt_secret_key=os.getenv("INTERNAL_JWT_SECRET_KEY", ""),
+            database_url=os.getenv("DATABASE_URL", "")
+        )
         
-    def validate_secrets(self):
-        """Fail fast if critical secrets are not configured"""
-        if not self.jwt_secret_key:
-            raise ValueError("JWT_SECRET_KEY not configured in secrets")
-        if not self.internal_jwt_secret_key:
-            raise ValueError("INTERNAL_JWT_SECRET_KEY not configured in secrets")
-        if not self.database_url:
-            raise ValueError("DATABASE_URL not configured in secrets")
+        if not instance.jwt_secret_key:
+            print("ERROR: JWT_SECRET_KEY not configured in Replit Secrets")
+            sys.exit(1)
+        if not instance.internal_jwt_secret_key:
+            print("ERROR: INTERNAL_JWT_SECRET_KEY not configured in Replit Secrets")
+            sys.exit(1)
+        if not instance.database_url:
+            print("ERROR: DATABASE_URL not configured in Replit Secrets")
+            sys.exit(1)
+            
+        return instance
 
-settings = Settings()
-settings.validate_secrets()
+settings = Settings.load_and_validate()

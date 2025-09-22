@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -102,9 +102,14 @@ async def submit_crdt_results(
     import httpx
     from ..proxy import create_internal_token
     
-    # Verify session exists
+    # Validate session_id format and verify session exists
+    try:
+        session_uuid = uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid session ID format")
+    
     result = await db.execute(
-        select(TestSession).where(TestSession.id == uuid.UUID(session_id))
+        select(TestSession).where(TestSession.id == session_uuid)
     )
     session = result.scalar_one_or_none()
     if not session:
@@ -121,7 +126,7 @@ async def submit_crdt_results(
     async with httpx.AsyncClient() as client:
         try:
             response = await client.post(
-                f"http://localhost:9090/v1/tests/sessions/{session_id}/results",
+                f"http://localhost:9091/v1/tests/sessions/{session_id}/results",
                 json={"changes": changes, "idempotency_key": idempotency_key},
                 headers=headers,
                 timeout=10.0
@@ -130,6 +135,8 @@ async def submit_crdt_results(
             return response.json()
         except httpx.TimeoutException:
             raise HTTPException(status_code=504, detail="Go service timeout")
+        except httpx.RequestError:
+            raise HTTPException(status_code=503, detail="Go service unavailable")
         except httpx.HTTPStatusError as e:
             raise HTTPException(status_code=e.response.status_code, detail=str(e))
 

@@ -11,7 +11,8 @@ from typing import Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
-from ..dependencies import get_current_user
+from ..dependencies import get_current_active_user
+from ..schemas.auth import TokenPayload
 from ..proxy import get_go_service_proxy, GoServiceProxy
 
 
@@ -39,7 +40,7 @@ class TestResultResponse(BaseModel):
 async def submit_test_results(
     session_id: str,
     results_data: TestResultSubmission,
-    user_id: str = Depends(get_current_user),
+    current_user: TokenPayload = Depends(get_current_active_user),
     proxy: GoServiceProxy = Depends(get_go_service_proxy)
 ):
     """
@@ -60,10 +61,10 @@ async def submit_test_results(
         result = await proxy.submit_test_results(
             session_id=session_id,
             results=results_data.results,
-            user_id=user_id
+            user_id=str(current_user.user_id)
         )
         
-        logger.info(f"Test results submitted successfully - Session: {session_id}, User: {user_id}")
+        logger.info(f"Test results submitted successfully - Session: {session_id}, User: {current_user.user_id}")
         
         return TestResultResponse(
             session_id=session_id,
@@ -72,11 +73,16 @@ async def submit_test_results(
             processed_at=result.get("processed_at")
         )
         
-    except HTTPException:
-        # Re-raise HTTP exceptions from proxy
+    except HTTPException as e:
+        # Re-raise HTTP exceptions from proxy (includes 503 for service unavailable)
+        if e.status_code == 503:
+            logger.error(f"Go service unavailable for session {session_id}")
         raise
     except Exception as e:
-        logger.error(f"Test results submission failed for session {session_id}, user {user_id}: {e}")
+        logger.error(f"Test results submission failed for session {session_id}, user {current_user.user_id}: {e}")
+        # Map connection errors to service unavailable
+        if "connection" in str(e).lower() or "timeout" in str(e).lower():
+            raise HTTPException(status_code=503, detail="Go service unavailable")
         raise HTTPException(
             status_code=500,
             detail="Internal server error during test results processing"
@@ -86,7 +92,7 @@ async def submit_test_results(
 @router.get("/sessions/{session_id}/results")
 async def get_test_results(
     session_id: str,
-    user_id: str = Depends(get_current_user)
+    current_user: TokenPayload = Depends(get_current_active_user)
 ):
     """
     Get test results for a specific session.
@@ -110,7 +116,7 @@ async def get_test_results(
 @router.get("/sessions/{session_id}/status")
 async def get_session_status(
     session_id: str,
-    user_id: str = Depends(get_current_user)
+    current_user: TokenPayload = Depends(get_current_active_user)
 ):
     """
     Get the status of a test session.
