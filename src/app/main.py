@@ -209,107 +209,9 @@ async def go_service_health():
     return process_manager.get_status()
 
 # Reverse proxy endpoints for Go service
-@app.post("/v1/evidence", tags=["Evidence"], summary="Submit Evidence", description="High-performance evidence submission endpoint (proxied to Go service)")
-async def proxy_evidence(request: Request, current_user: TokenPayload = Depends(get_current_active_user)):
-    """Reverse proxy for evidence endpoint to Go service with authentication"""
-    if not go_service_client:
-        raise HTTPException(status_code=503, detail="Performance service unavailable")
-    
-    try:
-        # Forward the request to Go service
-        body = await request.body()
-        original_headers = dict(request.headers)
-        
-        # Add authenticated headers for Go service with internal JWT
-        headers = {
-            "Content-Type": original_headers.get("content-type", "application/json"),
-            "X-Internal-Authorization": get_internal_jwt_token(str(current_user.user_id)),
-            "X-User-ID": str(current_user.user_id),
-            "User-Agent": original_headers.get("user-agent", "FastAPI-Proxy")
-        }
-        
-        # Forward critical client headers
-        if "idempotency-key" in original_headers:
-            headers["Idempotency-Key"] = original_headers["idempotency-key"]
-        
-        async def make_go_request():
-            return await go_service_client.post(
-                "/v1/evidence",
-                content=body,
-                headers=headers,
-                timeout=30.0
-            )
-        
-        response = await go_service_breaker.call(make_go_request)
-        
-        # Filter response headers to only include safe headers
-        safe_headers = {
-            k: v for k, v in response.headers.items() 
-            if k.lower() in ["content-type", "content-length", "cache-control"]
-        }
-        
-        return JSONResponse(
-            content=response.json(),
-            status_code=response.status_code,
-            headers=safe_headers
-        )
-        
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="Request timeout")
-    except httpx.RequestError as e:
-        logger.error(f"Request to Go service failed: {e}")
-        raise HTTPException(status_code=503, detail="Performance service error")
+# REMOVED: Duplicate app-level routes - handled by respective routers with proper validation
 
-@app.post("/v1/tests/sessions/{session_id}/results", tags=["Evidence"], summary="Submit Test Results", description="High-performance test results submission endpoint (proxied to Go service)")
-async def proxy_test_results(session_id: str, request: Request, current_user: TokenPayload = Depends(get_current_active_user)):
-    """Reverse proxy for test results endpoint to Go service with authentication"""
-    if not go_service_client:
-        raise HTTPException(status_code=503, detail="Performance service unavailable")
-    
-    try:
-        # Forward the request to Go service
-        body = await request.body()
-        original_headers = dict(request.headers)
-        
-        # Add authenticated headers for Go service with internal JWT
-        headers = {
-            "Content-Type": original_headers.get("content-type", "application/json"),
-            "X-Internal-Authorization": get_internal_jwt_token(str(current_user.user_id)),
-            "X-User-ID": str(current_user.user_id),
-            "User-Agent": original_headers.get("user-agent", "FastAPI-Proxy")
-        }
-        
-        # Forward critical client headers
-        if "idempotency-key" in original_headers:
-            headers["Idempotency-Key"] = original_headers["idempotency-key"]
-        
-        async def make_go_request():
-            return await go_service_client.post(
-                f"/v1/tests/sessions/{session_id}/results",
-                content=body,
-                headers=headers,
-                timeout=30.0
-            )
-        
-        response = await go_service_breaker.call(make_go_request)
-        
-        # Filter response headers to only include safe headers
-        safe_headers = {
-            k: v for k, v in response.headers.items() 
-            if k.lower() in ["content-type", "content-length", "cache-control"]
-        }
-        
-        return JSONResponse(
-            content=response.json(),
-            status_code=response.status_code,
-            headers=safe_headers
-        )
-        
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="Request timeout")
-    except httpx.RequestError as e:
-        logger.error(f"Request to Go service failed: {e}")
-        raise HTTPException(status_code=503, detail="Performance service error")
+# REMOVED: Duplicate app-level route - handled by test_sessions router
 
 # Import and include routers
 from .routers import rules, auth, rules_versioned, classify, users, evidence, test_results, rtl, buildings, test_sessions
@@ -343,7 +245,7 @@ app.include_router(rtl.router)  # RTL router has its own prefix (/v1/auth)
 app.include_router(buildings.router)  # Buildings router has its own prefix (/v1/buildings)
 app.include_router(test_sessions.router)  # Test sessions router has its own prefix (/v1/tests/sessions)
 app.include_router(evidence.router)  # Evidence router has its own prefix
-app.include_router(test_results.router)  # Test results router has its own prefix
+# app.include_router(test_results.router)  # REMOVED: Duplicate route conflict with test_sessions
 app.include_router(rules.router, prefix="/v1/rules")
 app.include_router(rules_versioned.router, prefix="/v2/rules")
 app.include_router(classify.router, prefix="/v1/classify")
