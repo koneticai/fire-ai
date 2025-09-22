@@ -1,0 +1,123 @@
+1. Primary Objective
+Achieve actual, empirically-proven 100% TDD compliance for Phase 2. This prompt will fix the failing validation tests by implementing a proper authentication override. It will then implement the TDD-mandated Pact contract testing and Chaos Toolkit resilience testing that are currently missing. Successful execution of this prompt will formally and verifiably complete Phase 2.
+
+2. Step 1: Fix Failing Tests with Dependency Overrides
+The failing tests are due to improper handling of authentication dependencies. We will fix this by creating a conftest.py file to override the security dependency during testing, ensuring tests are deterministic and independent of live authentication.
+
+A. Create tests/conftest.py:
+This file will provide a mock user fixture for all tests, resolving the authentication failures.
+
+Python
+# tests/conftest.py
+import pytest
+import uuid
+from typing import Dict
+
+from src.app.main import app
+from src.app.dependencies import get_current_active_user
+from src.app.schemas.token import TokenData
+
+async def override_get_current_active_user() -> TokenData:
+    """A mock dependency that provides a consistent test user."""
+    return TokenData(user_id=uuid.uuid4(), username="testuser@example.com")
+
+# Apply the override to the FastAPI application for all tests
+app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+3. Step 2: Implement TDD-Mandated Pact Contract Testing
+As required by TDD Task 2.3, we will now add the 
+
+pact-python library and create a consumer-driven contract test.
+
+A. Add Dependencies:
+Execute in the Shell:
+Bash
+poetry add pact-python
+B. Create Pact Contract Test:
+Create a new test file tests/test_pact_contract.py.
+
+Python
+# tests/test_pact_contract.py
+import pytest
+import requests
+from pact import Consumer, Provider, Like
+
+# Configure the Pact consumer and provider
+pact = Consumer('FireMode-MobileApp').has_pact_with(
+    Provider('FireMode-API'), port=8000
+)
+
+@pytest.fixture(scope="session")
+def pact_session():
+    pact.start_service()
+    yield
+    pact.stop_service()
+
+def test_get_offline_bundle_contract(pact_session):
+    """TDD Task 2.3: Validates the contract for the offline bundle endpoint."""
+    expected_body = {
+        "session_id": Like("123e4567-e89b-12d3-a456-426614174000"),
+        "timestamp": Like("2025-09-22T14:00:00Z"),
+        "data": {
+            "building": {},
+            "assets": [],
+            "prior_faults": []
+        }
+    }
+
+    (pact
+     .given('a test session with ID "test-session-123" exists')
+     .upon_receiving('a request for an offline bundle')
+     .with_request('GET', '/v1/tests/sessions/test-session-123/offline_bundle')
+     .will_respond_with(200, body=expected_body))
+
+    with pact:
+        # The request is sent to the mock server, not the real one.
+        response = requests.get(pact.uri + '/v1/tests/sessions/test-session-123/offline_bundle')
+        assert response.status_code == 200
+4. Step 3: Implement TDD-Mandated Chaos Engineering Test
+As required by TDD Task 2.4, we will add 
+
+chaostoolkit and define a basic resilience test.
+
+A. Add Dependencies:
+Execute in the Shell:
+Bash
+poetry add chaostoolkit chaostoolkit-httpx
+B. Create Chaos Experiment Definition:
+Create a new file tests/chaos/resilience_test.json. This experiment will probe the health endpoint to ensure the service remains available.
+
+JSON
+{
+    "version": "1.0.0",
+    "title": "TDD Task 2.4: Validate API Availability",
+    "description": "Ensures the FireMode API remains healthy and responsive.",
+    "method": [
+        {
+            "type": "probe",
+            "name": "api-is-healthy",
+            "provider": {
+                "type": "python",
+                "module": "chaoshumio.probes",
+                "func": "ensure_service_is_healthy",
+                "arguments": {
+                    "url": "http://localhost:8000/health/ready"
+                }
+            }
+        }
+    ]
+}
+5. Step 4: Final Validation
+Phase 2 is complete only when all test suites—including the previously failing ones and the newly added TDD-mandated tests—pass without error.
+Execute the full validation suite in the Shell:
+Bash
+# First, run the standard pytest suite, which should now fully pass
+echo "--- Running Standard Compliance Tests ---"
+poetry run pytest tests/test_100_percent_compliance.py -v
+
+# Next, generate the Pact contract file
+echo "--- Running Pact Contract Generation ---"
+poetry run pytest tests/test_pact_contract.py -v
+
+# Finally, run the chaos engineering experiment
+echo "--- Running Chaos Resilience Test ---"
+poetry run chaos run tests/chaos/resilience_test.json

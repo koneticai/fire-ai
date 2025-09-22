@@ -71,20 +71,26 @@ def mock_db_session():
     return mock_session
 
 
-@pytest.fixture(autouse=True)
-def mock_get_current_active_user(test_user_data: dict):
-    """Mock authentication dependency for all tests."""
+async def override_get_current_active_user():
+    """A mock dependency that provides a consistent test user."""
     from src.app.schemas.auth import TokenPayload
-    
-    token_payload = TokenPayload(
-        user_id=uuid.UUID(test_user_data["user_id"]),
-        username=test_user_data["username"],
+    return TokenPayload(
+        user_id=uuid.UUID("550e8400-e29b-41d4-a716-446655440000"), 
+        username="testuser@example.com",
         jti=uuid.uuid4(),
         exp=None
     )
+
+# Apply the override to the FastAPI application for all tests
+@pytest.fixture(autouse=True)
+def setup_auth_override():
+    """Set up authentication override for all tests."""
+    from src.app.main import app
+    from src.app.dependencies import get_current_active_user
     
-    with patch("src.app.dependencies.get_current_active_user", return_value=token_payload):
-        yield token_payload
+    app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+    yield
+    # Clean up is handled by mock_database_dependencies
 
 
 @pytest.fixture(autouse=True)
