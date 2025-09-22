@@ -13,7 +13,9 @@ import semver
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 
 from ..models import AS1851Rule, AS1851RuleCreate
-from ..dependencies import get_current_active_user, get_database_connection
+from ..dependencies import get_current_active_user
+from ..database.core import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
 from ..schemas.token import TokenData, APIResponse
 
 router = APIRouter(tags=["AS1851 Rules (Versioned)"])
@@ -24,7 +26,7 @@ router = APIRouter(tags=["AS1851 Rules (Versioned)"])
 async def create_versioned_rule(
     rule: AS1851RuleCreate,
     current_user: TokenData = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """Creates a new, versioned AS1851 rule. Rejects duplicates."""
     
@@ -105,7 +107,7 @@ async def create_versioned_rule(
             description="Lists all active AS1851 rule versions available in the system.")
 async def get_all_active_versioned_rules(
     current_user: TokenData = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """Lists all active AS1851 rules (all versions)."""
     
@@ -151,7 +153,7 @@ async def get_all_active_versioned_rules(
 async def get_latest_active_rule_by_code(
     rule_code: str,
     current_user: TokenData = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """Gets the latest active version of a rule by its code."""
     
@@ -223,7 +225,7 @@ async def get_all_rule_versions(
     rule_code: str,
     include_inactive: bool = False,
     current_user: TokenData = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """Gets all versions of a specific rule by its code."""
     
@@ -279,7 +281,7 @@ async def deactivate_rule_version(
     rule_id: UUID,
     request: Request,
     current_user: TokenData = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """Deactivates a specific rule version. This is the only way to 'update' a rule."""
     

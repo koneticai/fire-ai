@@ -13,7 +13,9 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..dependencies import get_current_active_user, get_database_connection
+from ..dependencies import get_current_active_user
+from ..database.core import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
 from ..models.rtl import TokenRevocationList
 
 
@@ -52,7 +54,7 @@ class RevokedTokenInfo(BaseModel):
 async def revoke_token(
     request: TokenRevocationRequest,
     current_user = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Revoke a JWT token by adding it to the revocation list.
@@ -121,7 +123,7 @@ async def revoke_token(
 async def revoke_my_token(
     reason: str = "user_logout",
     current_user = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Revoke the current user's token (logout).
@@ -172,7 +174,7 @@ async def list_revoked_tokens(
     limit: int = 100,
     offset: int = 0,
     current_user = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     List revoked tokens (admin endpoint).
@@ -220,7 +222,7 @@ async def list_revoked_tokens(
 @router.delete("/cleanup-expired-tokens")
 async def cleanup_expired_tokens(
     current_user = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Clean up expired token revocation entries.

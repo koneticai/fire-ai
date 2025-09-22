@@ -11,11 +11,13 @@ from uuid import UUID
 import psycopg2
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import TestSession as TestSessionModel
 from ..schemas.test_session import TestSessionRead, TestSessionCreate, TestSessionListResponse
 # Note: Using simplified imports since full test session API is now in test_sessions.py
-from ..dependencies import get_current_active_user, get_database_connection
+from ..dependencies import get_current_active_user
+from ..database.core import get_db
 from ..schemas.auth import TokenPayload
 
 # Import automerge for CRDT operations
@@ -118,7 +120,7 @@ async def list_test_sessions(
     limit: int = Query(default=50, ge=1, le=100),
     cursor: Optional[str] = Query(default=None),
     current_user: TokenPayload = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """List test sessions with cursor-based pagination using vector_clock"""
     
@@ -192,7 +194,7 @@ async def list_test_sessions(
 async def create_test_session(
     session_data: TestSessionCreate,
     current_user: TokenPayload = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """Create a new test session"""
     
@@ -242,7 +244,7 @@ async def create_test_session(
 async def get_test_session(
     session_id: UUID,
     current_user: TokenPayload = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get a specific test session by ID"""
     
@@ -289,7 +291,7 @@ async def apply_session_changes(
     session_id: UUID,
     changes_request: dict,
     current_user: TokenPayload = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """Apply CRDT changes to a test session (stub implementation)"""
     

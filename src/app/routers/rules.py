@@ -39,7 +39,9 @@ except ImportError:
     class APIResponse(BaseModel):
         message: str
         data: Optional[Any] = None
-from ..dependencies import get_current_active_user, get_database_connection
+from ..dependencies import get_current_active_user
+from ..database.core import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
 from ..schemas.token import TokenData
 
 router = APIRouter(tags=["AS1851 Rules"])
@@ -47,7 +49,7 @@ router = APIRouter(tags=["AS1851 Rules"])
 @router.get("/", response_model=List[AS1851Rule], summary="List AS1851 Rules", description="Retrieve all active AS1851 compliance rules available in the system, sorted by rule code")
 async def list_rules(
     current_user: TokenData = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """List all active AS1851 rules"""
     
@@ -91,7 +93,7 @@ async def list_rules(
 async def create_rule(
     rule_data: AS1851RuleCreate,
     current_user: TokenData = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """Create a new AS1851 rule"""
     
@@ -153,7 +155,7 @@ async def create_rule(
 async def get_rule_by_code(
     rule_code: str,
     current_user: TokenData = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get a specific rule by code"""
     
@@ -200,7 +202,7 @@ async def classify_faults(
     classification_request: FaultClassificationRequest,
     request: Request,
     current_user: TokenData = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """Classify faults based on evidence and rules"""
     
@@ -300,7 +302,7 @@ async def classify_faults(
 async def get_rule_by_id(
     rule_id: UUID,
     current_user: TokenData = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get a specific rule by UUID"""
     
@@ -347,7 +349,7 @@ async def update_rule(
     rule_id: UUID,
     rule_data: AS1851RuleCreate,
     current_user: TokenData = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """Update an existing AS1851 rule"""
     
@@ -423,7 +425,7 @@ async def update_rule(
 async def deactivate_rule(
     rule_code: str,
     current_user: TokenData = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """Deactivate a rule"""
     

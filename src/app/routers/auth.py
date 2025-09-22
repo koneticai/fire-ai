@@ -12,7 +12,9 @@ import psycopg2
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 
 from ..schemas.token import TokenData, APIResponse
-from ..dependencies import get_current_active_user, get_database_connection
+from ..dependencies import get_current_active_user
+from ..database.core import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(tags=["Authentication"])
 
@@ -20,7 +22,7 @@ router = APIRouter(tags=["Authentication"])
 async def logout(
     request: Request,
     current_user: TokenData = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Revokes the current user's token by adding its JTI to the revocation list.

@@ -1,8 +1,8 @@
 """
 FastAPI dependencies for authentication and database
+Consolidated version with async-only JWT validation and proper RTL checking
 """
 
-import os
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional
@@ -11,7 +11,6 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt, ExpiredSignatureError
-import psycopg2
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -24,24 +23,19 @@ from .schemas.auth import TokenPayload
 security = HTTPBearer()
 
 async def get_current_active_user(
-    token: HTTPBearer = Depends(security),
+    token: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db)
-) -> TokenData:
-    """Validate JWT and check revocation list"""
+) -> TokenPayload:
+    """Validate JWT and check revocation list using async database operations"""
     try:
-        payload = jwt.decode(
-            token.credentials,
-            settings.jwt_secret_key,
-            algorithms=[settings.algorithm]
-        )
+        # Use verify_token for consistent validation logic
+        token_data = verify_token(token.credentials)
         
-        # Check RTL
-        jti = payload.get("jti")
-        if jti:
-            from sqlalchemy import select
+        # Check RTL using async SQLAlchemy operations
+        if token_data.jti:
             result = await db.execute(
                 select(TokenRevocationList).where(
-                    TokenRevocationList.jti == jti
+                    TokenRevocationList.jti == token_data.jti
                 )
             )
             if result.scalar_one_or_none():
@@ -50,30 +44,15 @@ async def get_current_active_user(
                     detail="Token has been revoked"
                 )
         
-        return TokenData(**payload)
+        return token_data
         
-    except JWTError:
+    except HTTPException:
+        # Re-raise HTTP exceptions (including those from verify_token)
+        raise
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token"
-        )
-
-def get_database_connection():
-    """Get database connection"""
-    database_url = os.getenv("DATABASE_URL")
-    if not database_url:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database configuration error"
-        )
-    
-    try:
-        conn = psycopg2.connect(database_url)
-        return conn
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database connection failed"
         )
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -84,7 +63,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS)
+        expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
     
     # Add JWT ID for revocation tracking
     jti = str(uuid.uuid4())
@@ -94,13 +73,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         "iat": datetime.utcnow()
     })
     
-    encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.algorithm)
     return encoded_jwt
 
 def verify_token(token: str) -> TokenPayload:
     """Verify JWT token and return token data"""
     try:
-        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.algorithm])
         username = payload.get("sub")
         user_id = payload.get("user_id")
         jti = payload.get("jti")
@@ -145,80 +124,17 @@ def verify_token(token: str) -> TokenPayload:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-def check_token_revocation(jti: str, conn) -> bool:
-    """Check if token is in revocation list"""
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute(
-                "SELECT COUNT(*) FROM token_revocation_list WHERE token_jti = %s AND expires_at > CURRENT_TIMESTAMP",
-                (jti,)
-            )
-            count = cursor.fetchone()[0]
-            return count > 0
-    except Exception:
-        # If we can't check revocation, err on the side of caution
-        return True
+def get_password_hash(password: str) -> str:
+    """Hash password for storage"""
+    import bcrypt
+    salt = bcrypt.gensalt()
+    password_hash = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return password_hash.decode('utf-8')
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    conn = Depends(get_database_connection)
-) -> TokenPayload:
-    """Get current authenticated user from JWT token with RTL check"""
-    
-    token = credentials.credentials
-    token_data = verify_token(token)
-    
-    # Check token revocation list
-    if check_token_revocation(str(token_data.jti), conn):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has been revoked",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    conn.close()
-    return token_data
-
-async def get_current_active_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    conn = Depends(get_database_connection)
-) -> TokenPayload:
-    """
-    Foundational JWT Authorizer with Token Revocation List (RTL) check.
-    
-    Extracts JWT from Authorization: Bearer header, validates the token,
-    and checks against revocation list before returning token payload.
-    """
-    
-    token = credentials.credentials
-    
-    try:
-        # Delegate to verify_token for consistent validation
-        token_data = verify_token(token)
-        
-        # Critical RTL Check - query database for revoked tokens
-        if check_token_revocation(str(token_data.jti), conn):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token has been revoked",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        # Close connection and return token payload if valid and not revoked
-        conn.close()
-        return token_data
-        
-    except HTTPException:
-        # Close connection on HTTP exceptions and re-raise
-        if conn:
-            conn.close()
-        raise
-    except Exception as e:
-        # Close connection on any other exception and return 401
-        if conn:
-            conn.close()
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token validation failed",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify password against hash"""
+    import bcrypt
+    return bcrypt.checkpw(
+        plain_password.encode('utf-8'),
+        hashed_password.encode('utf-8')
+    )

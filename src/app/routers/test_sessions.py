@@ -17,7 +17,7 @@ from ..config import settings
 from ..database.core import get_db
 from ..dependencies import get_current_active_user
 from ..models.test_sessions import TestSession
-from ..schemas.token import TokenData
+from ..schemas.auth import TokenPayload
 
 router = APIRouter(prefix="/v1/tests/sessions", tags=["test_sessions"])
 
@@ -29,7 +29,7 @@ async def list_test_sessions(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_active_user)
+    current_user: TokenPayload = Depends(get_current_active_user)
 ):
     """List test sessions with proper cursor pagination"""
     query = select(TestSession)
@@ -96,7 +96,7 @@ async def submit_crdt_results(
     changes: List[dict],
     idempotency_key: str = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_active_user)
+    current_user: TokenPayload = Depends(get_current_active_user)
 ):
     """Submit CRDT results with idempotency"""
     import httpx
@@ -137,7 +137,7 @@ async def submit_crdt_results(
 async def get_test_session(
     session_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_active_user)
+    current_user: TokenPayload = Depends(get_current_active_user)
 ):
     """Get specific test session with ownership validation"""
     try:
@@ -171,7 +171,7 @@ async def get_test_session(
 async def create_test_session(
     session_data: dict,
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_active_user)
+    current_user: TokenPayload = Depends(get_current_active_user)
 ):
     """Create new test session"""
     from ..utils.vector_clock import VectorClock

@@ -13,7 +13,9 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from ..schemas.user import UserProfile
 from ..schemas.audit import AuditLogEntry
 from ..schemas.token import TokenData
-from ..dependencies import get_current_active_user, get_database_connection
+from ..dependencies import get_current_active_user
+from ..database.core import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
 from ..security import decrypt_pii
 
 router = APIRouter(tags=["Users"])
@@ -23,7 +25,7 @@ router = APIRouter(tags=["Users"])
             description="Retrieves the profile for the currently authenticated user with decrypted PII data.")
 async def get_current_user_profile(
     current_user: TokenData = Depends(get_current_active_user),
-    conn = Depends(get_database_connection)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Retrieves the profile for the currently authenticated user.
@@ -80,7 +82,7 @@ async def get_current_user_profile(
             description="Retrieves a paginated history of the current user's compliance activities and system interactions.")
 async def get_user_audit_history(
     current_user: TokenData = Depends(get_current_active_user),
-    conn = Depends(get_database_connection),
+    db: AsyncSession = Depends(get_db),
     skip: int = Query(0, ge=0, description="Number of records to skip for pagination"),
     limit: int = Query(100, ge=1, le=500, description="Maximum number of records to return")
 ):
