@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "fire-ai-api"
+version = "0.1.0"
+description = "Fire AI API service"
+authors = ["Fire AI Team <team@fire-ai.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+fastapi = "^0.104.1"
+uvicorn = "^0.24.0"
+structlog = "^23.2.0"
+prometheus-client = "^0.19.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+httpx = "^0.25.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry-core"
