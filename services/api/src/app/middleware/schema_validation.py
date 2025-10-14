@@ -17,7 +17,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp
-from ...schemas.registry import SchemaRegistry
+from schemas.registry import SchemaRegistry
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 BODY_METHODS = {"POST", "PUT", "PATCH"}

@@ -161,7 +161,7 @@ class SchemaRegistry:
             validator = self._validator(endpoint, version, "RESP")
         except SchemaNotFoundError:
             return True  # don't punish response path for missing schema
-        return Draft7Validator.is_valid(validator.schema, instance=data) or (len(list(validator.iter_errors(data))) == 0)
+        return validator.is_valid(data)
 
     def list_schemas(self) -> List[str]:
         # Return only request endpoints (user-facing)

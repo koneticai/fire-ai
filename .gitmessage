@@ -1,3 +1,6 @@
-<type>(<scope>): <subject> [<ticket-id>]
-<body>
-MPKF-Ref: <section>,v3.1  Relates-To: <related-tickets>
+# MPKF Commit Template
+# Format: <type>(<scope>): <subject>
+#
+# Types: feat|fix|docs|style|refactor|perf|test|build|ci|chore
+# MPKF-Ref: TDD-v4.0-Section-X.Y
+# Relates-To: FM-ENH-XXX
