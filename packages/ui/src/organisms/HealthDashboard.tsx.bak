@@ -1,0 +1,8 @@
+import * as React from 'react';
+import { tokens } from '../tokens';
+export const HealthDashboard: React.FC = () => (
+  <section role="region" aria-label="Health Status" style={{ padding: tokens.spacing.md }}>
+    <h1 style={{ fontSize: tokens.typTypography?.fontSize?.xl ?? tokens.typography.fontSize.xl, marginTop: 0 }}>Health Status</h1>
+    <p role="status" aria-live="polite">All systems nominal.</p>
+  </section>
+);
