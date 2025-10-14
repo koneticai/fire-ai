@@ -9,11 +9,13 @@ from pathlib import Path
 from typing import Dict, Optional, Tuple, List
 import json
 import re
+import os
 from functools import lru_cache
 from datetime import datetime
 import secrets
 
 from jsonschema import Draft7Validator, RefResolver, exceptions as js_exceptions
+from .loader_dynamodb import DynamoDBSchemaLoader
 
 class SchemaNotFoundError(KeyError):
     pass
@@ -24,8 +26,9 @@ _SCHEMA_STORE: Dict[str, Dict[str, dict]] = {}
 _VALIDATORS: Dict[str, Dict[str, Draft7Validator]] = {}
 
 class SchemaRegistry:
-    def __init__(self, schemas_root: Optional[Path] = None) -> None:
+    def __init__(self, schemas_root: Optional[Path] = None, loader: Optional[DynamoDBSchemaLoader] = None) -> None:
         self.schemas_root = Path(schemas_root or Path(__file__).parent)
+        self.loader = loader or (DynamoDBSchemaLoader() if os.getenv("FIRE_SCHEMA_SOURCE", "local+ddb") != "local-only" else None)
         self._load_all_schemas()
 
     def _endpoint_from_filename(self, subdir: str, name: str) -> str:
@@ -70,19 +73,73 @@ class SchemaRegistry:
                 count += 1
         return count
 
+    def _common_store(self) -> dict:
+        """Build store of common schema refs for RefResolver."""
+        common_dir = self.schemas_root / "common"
+        store = {}
+        for p in common_dir.rglob("*.json"):
+            with p.open("r", encoding="utf-8") as f:
+                doc = json.load(f)
+            if "$id" in doc:
+                store[doc["$id"]] = doc
+        return store
+
+    def _get_validator(self, endpoint: str, version: str = "v1", schema_type: str = "REQ") -> Draft7Validator:
+        """
+        DB-first lookup (active version), with fallback to local.
+        Try DB (active or specific version) → compile & cache; else fallback to local compiled.
+        """
+        key = self._key(endpoint, schema_type)
+        cache = _VALIDATORS.setdefault(key, {})
+        if version in cache:
+            return cache[version]
+
+        # 1) Try explicit version from DB
+        if self.loader:
+            try:
+                schema = self.loader.fetch(endpoint, version)
+                if schema:
+                    resolver = RefResolver.from_schema(schema, store=self._common_store())
+                    cache[version] = Draft7Validator(schema, resolver=resolver)
+                    _SCHEMA_STORE.setdefault(key, {})[version] = schema
+                    return cache[version]
+            except Exception:
+                pass
+            # 2) Try active version from DB (if requested version was missing)
+            try:
+                active = self.loader.fetch_active(endpoint)
+                if active:
+                    v, schema = active
+                    resolver = RefResolver.from_schema(schema, store=self._common_store())
+                    cache[v] = Draft7Validator(schema, resolver=resolver)
+                    _SCHEMA_STORE.setdefault(key, {})[v] = schema
+                    # Prefer requested version if compiled later
+                    return cache.get(version, cache[v])
+            except Exception:
+                pass
+
+        # 3) Fallback to local compiled validator (loaded during _load_all_schemas)
+        if version in cache:
+            return cache[version]
+        raise SchemaNotFoundError(f"Validator not found for {schema_type}:{endpoint} {version}")
+
     def get_schema(self, endpoint: str, version: str = "v1", schema_type: str = "REQ") -> dict:
+        """Prefer in-memory / DB-populated store, else try DB, else raise."""
         try:
             key = self._key(endpoint, schema_type)
             return _SCHEMA_STORE[key][version]
-        except KeyError as e:
-            raise SchemaNotFoundError(f"Schema not found for {schema_type}:{endpoint} {version}") from e
+        except KeyError:
+            if self.loader:
+                s = self.loader.fetch(endpoint, version)
+                if s:
+                    key = self._key(endpoint, schema_type)
+                    _SCHEMA_STORE.setdefault(key, {})[version] = s
+                    return s
+            raise SchemaNotFoundError(f"Schema not found for {schema_type}:{endpoint} {version}")
 
     def _validator(self, endpoint: str, version: str = "v1", schema_type: str = "REQ") -> Draft7Validator:
-        try:
-            key = self._key(endpoint, schema_type)
-            return _VALIDATORS[key][version]
-        except KeyError as e:
-            raise SchemaNotFoundError(f"Validator not found for {schema_type}:{endpoint} {version}") from e
+        """Use new _get_validator method for DB-first lookup with fallback."""
+        return self._get_validator(endpoint, version, schema_type)
 
     @staticmethod
     def _now_utc_iso() -> str:

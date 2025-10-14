@@ -5,13 +5,18 @@ Implements TDD v4.0 §11.5 compliance verification.
 """
 
 import pytest
+import os
 from schemas.registry import SchemaRegistry, SchemaNotFoundError
 
 
 @pytest.fixture(scope="module")
 def registry() -> SchemaRegistry:
     """Fixture that provides a SchemaRegistry instance loaded from services/api/schemas/**"""
-    return SchemaRegistry()  # loads from services/api/schemas/**
+    # Use local-only mode to avoid DynamoDB dependency in tests
+    os.environ["FIRE_SCHEMA_SOURCE"] = "local-only"
+    reg = SchemaRegistry()  # loads from services/api/schemas/**
+    os.environ.pop("FIRE_SCHEMA_SOURCE", None)
+    return reg
 
 
 def test_load_schemas_on_init(registry):
