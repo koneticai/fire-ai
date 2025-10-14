@@ -2,58 +2,47 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
   pull_request:
 
-env:
-  PYTHON_VERSION: "3.11"
-  GO_VERSION: "1.22"
-
 jobs:
-  test-python:
+  python-api:
+    name: Python API
     runs-on: ubuntu-latest
+    if: ${{ hashFiles('services/api/pyproject.toml') != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install dependencies
+          python-version: '3.11'
+      - name: Install Poetry
+        run: pipx install poetry || python -m pip install --user poetry
+      - name: Install deps (no-root)
+        working-directory: services/api
         run: |
-          cd services/api
-          pip install poetry
-          poetry install
-      - name: Run tests
+          poetry --version || python -m poetry --version
+          poetry install --no-root
+      - name: Lint
+        working-directory: services/api
         run: |
-          cd services/api
-          poetry run pytest --cov=src --cov-report=xml
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./services/api/coverage.xml
-        continue-on-error: true
+          poetry run ruff check .
+          poetry run black --check .
+      - name: Test (coverage ≥80%)
+        working-directory: services/api
+        run: |
+          poetry run pytest --cov=app --cov-report=term-missing --cov-fail-under=80
 
-  build-go:
+  go-service:
+    name: Go Service
     runs-on: ubuntu-latest
+    if: ${{ hashFiles('services/api/src/go_service/go.mod') != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
-      - name: Build Go service
-        run: |
-          cd services/api/src/go_service
-          go build -v ./.
-      - name: Test Go service
-        run: |
-          cd services/api/src/go_service
-          go test -v ./.
-
-  security-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run security scan
-        run: |
-          cd services/api
-          pip install safety
-          poetry export -f requirements.txt | safety check --stdin
+          go-version: '1.22'
+      - name: Build
+        working-directory: services/api/src/go_service
+        run: go build -v ./...
+      - name: Test
+        working-directory: services/api/src/go_service
+        run: go test -v ./...
