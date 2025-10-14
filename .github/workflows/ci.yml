@@ -68,15 +68,43 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       
-      - name: Build Go service
+      - name: Detect Go service path
+        id: gosvc
         run: |
-          cd services/api/src/go_service
-          go build -v ./... || true
+          if [ -d "src/go_service" ] && [ -f "src/go_service/main.go" ]; then
+            echo "path=src/go_service" >> $GITHUB_OUTPUT
+            echo "✓ Found Go service at src/go_service"
+          elif [ -d "services/api/src/go_service" ] && [ -f "services/api/src/go_service/main.go" ]; then
+            echo "path=services/api/src/go_service" >> $GITHUB_OUTPUT
+            echo "✓ Found Go service at services/api/src/go_service"
+          else
+            echo "path=" >> $GITHUB_OUTPUT
+            echo "⚠ No Go service found. Checked:"
+            echo "  - src/go_service/main.go"
+            echo "  - services/api/src/go_service/main.go"
+          fi
       
-      - name: Test Go service
+      - name: Build Go service (if present)
+        if: steps.gosvc.outputs.path != ''
         run: |
-          cd services/api/src/go_service
-          go test -v ./... || true
+          cd "${{ steps.gosvc.outputs.path }}"
+          echo "Building Go service from ${{ steps.gosvc.outputs.path }}"
+          go build -v ./...
+      
+      - name: Test Go service (if present)
+        if: steps.gosvc.outputs.path != ''
+        run: |
+          cd "${{ steps.gosvc.outputs.path }}"
+          echo "Testing Go service from ${{ steps.gosvc.outputs.path }}"
+          go test -v ./...
+      
+      - name: Note - Go service not present (skip)
+        if: steps.gosvc.outputs.path == ''
+        run: |
+          echo "ℹ️  No Go service directory found. Skipping Go build/test."
+          echo "   If you expect a Go service, ensure main.go exists at one of:"
+          echo "   - src/go_service/main.go"
+          echo "   - services/api/src/go_service/main.go"
 
   security-scan:
     runs-on: ubuntu-latest
