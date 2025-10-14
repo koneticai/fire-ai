@@ -2,14 +2,9 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, "enhancement/**", "feature/**", "fix/**"]
   pull_request:
     branches: [main, develop]
-
-env:
-  NODE_VERSION: '18'
-  PYTHON_VERSION: '3.11'
-  GO_VERSION: '1.21'
 
 jobs:
   lint-python:
@@ -20,18 +15,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: '3.11'
       
       - name: Install Poetry
-        run: pip install poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
       
       - name: Install dependencies
         run: poetry install
       
       - name: Lint with pylint
-        run: poetry run pylint src/app || true
+        run: poetry run pylint src/app --exit-zero
 
   test-python:
     runs-on: ubuntu-latest
@@ -41,22 +39,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: '3.11'
+      
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
       
       - name: Install dependencies
-        run: |
-          pip install poetry
-          poetry install
+        run: poetry install
       
       - name: Run tests
-        run: poetry run pytest --cov=src --cov-report=xml || true
+        run: poetry run pytest --cov=src --cov-report=json --cov-report=term
       
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
-          file: ./services/api/coverage.xml
+          files: ./services/api/coverage.json
+          flags: python
         continue-on-error: true
 
   build-go:
@@ -66,54 +69,52 @@ jobs:
       
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version: '1.22'
       
       - name: Detect Go service path
         id: gosvc
         run: |
-          if [ -d "src/go_service" ] && [ -f "src/go_service/main.go" ]; then
-            echo "path=src/go_service" >> $GITHUB_OUTPUT
-            echo "✓ Found Go service at src/go_service"
-          elif [ -d "services/api/src/go_service" ] && [ -f "services/api/src/go_service/main.go" ]; then
-            echo "path=services/api/src/go_service" >> $GITHUB_OUTPUT
-            echo "✓ Found Go service at services/api/src/go_service"
+          if [ -d "services/api/src/go_service" ]; then
+            echo "path=services/api/src/go_service" >> "$GITHUB_OUTPUT"
+          elif [ -d "src/go_service" ]; then
+            echo "path=src/go_service" >> "$GITHUB_OUTPUT"
           else
-            echo "path=" >> $GITHUB_OUTPUT
-            echo "⚠ No Go service found. Checked:"
-            echo "  - src/go_service/main.go"
-            echo "  - services/api/src/go_service/main.go"
+            echo "path=" >> "$GITHUB_OUTPUT"
           fi
       
       - name: Build Go service (if present)
         if: steps.gosvc.outputs.path != ''
-        run: |
-          cd "${{ steps.gosvc.outputs.path }}"
-          echo "Building Go service from ${{ steps.gosvc.outputs.path }}"
-          go build -v ./...
+        run: cd "${{ steps.gosvc.outputs.path }}" && go build -v ./...
       
       - name: Test Go service (if present)
         if: steps.gosvc.outputs.path != ''
-        run: |
-          cd "${{ steps.gosvc.outputs.path }}"
-          echo "Testing Go service from ${{ steps.gosvc.outputs.path }}"
-          go test -v ./...
+        run: cd "${{ steps.gosvc.outputs.path }}" && go test -v ./...
       
       - name: Note - Go service not present (skip)
         if: steps.gosvc.outputs.path == ''
-        run: |
-          echo "ℹ️  No Go service directory found. Skipping Go build/test."
-          echo "   If you expect a Go service, ensure main.go exists at one of:"
-          echo "   - src/go_service/main.go"
-          echo "   - services/api/src/go_service/main.go"
+        run: echo "No Go service directory found. Skipping Go build/test."
 
   security-scan:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/api
     steps:
       - uses: actions/checkout@v4
       
-      - name: Run security scan
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Poetry
         run: |
-          cd services/api
-          pip install safety poetry
-          poetry export -f requirements.txt --without-hashes | safety check --stdin || true
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      
+      - name: Install safety
+        run: pip install safety
+      
+      - name: Security check
+        run: poetry export -f requirements.txt | safety check --stdin
         continue-on-error: true
