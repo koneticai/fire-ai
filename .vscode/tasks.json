@@ -1,0 +1,11 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Fire-AI: Full Check (Tests→Validators→Commit→Push)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/full-check.sh",
+      "problemMatcher": []
+    }
+  ]
+}
