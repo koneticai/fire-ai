@@ -1,0 +1,12 @@
+{
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": { "source.fixAll.eslint": true },
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": true,
+  "python.formatting.provider": "black",
+  "[python]": { "editor.defaultFormatter": "ms-python.black-formatter", "editor.rulers": [88] },
+  "go.useLanguageServer": true,
+  "go.formatTool": "gofmt",
+  "files.exclude": { "**/__pycache__": true, "**/.pytest_cache": true, "**/.mypy_cache": true },
+  "search.exclude": { "**/node_modules": true, "**/venv": true }
+}
