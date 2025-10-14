@@ -30,8 +30,13 @@ class SchemaRegistry:
 
     def _endpoint_from_filename(self, subdir: str, name: str) -> str:
         # "post_results" -> "POST /results"
+        # "error_422" -> "ERROR /422"
         method, path = name.split("_", 1)
-        return f"{method.upper()} /{path.replace('_','-')}"
+        return f"{method.upper()} /{path.replace('_','/')}"
+
+    def _key(self, endpoint: str, schema_type: str) -> str:
+        """Generate storage key: REQ:POST /results or RESP:POST /results"""
+        return f"{schema_type}:{endpoint}"
 
     def _load_all_schemas(self) -> int:
         import itertools
@@ -46,6 +51,7 @@ class SchemaRegistry:
                     common_ids[doc["$id"]] = doc
 
         for subdir in ("requests", "responses"):
+            schema_type = "REQ" if subdir == "requests" else "RESP"
             for p in (self.schemas_root / subdir).rglob("*.json"):
                 with p.open("r", encoding="utf-8") as f:
                     schema = json.load(f)
@@ -54,26 +60,29 @@ class SchemaRegistry:
                     continue
                 endpoint = self._endpoint_from_filename(subdir, m.group("name"))
                 version = f"v{m.group('num')}"
-                _SCHEMA_STORE.setdefault(endpoint, {})[version] = schema
+                key = self._key(endpoint, schema_type)
+                _SCHEMA_STORE.setdefault(key, {})[version] = schema
 
                 # Build a RefResolver that knows about our common IDs
                 resolver = RefResolver.from_schema(schema, store=common_ids)
                 validator = Draft7Validator(schema, resolver=resolver)
-                _VALIDATORS.setdefault(endpoint, {})[version] = validator
+                _VALIDATORS.setdefault(key, {})[version] = validator
                 count += 1
         return count
 
-    def get_schema(self, endpoint: str, version: str = "v1") -> dict:
+    def get_schema(self, endpoint: str, version: str = "v1", schema_type: str = "REQ") -> dict:
         try:
-            return _SCHEMA_STORE[endpoint][version]
+            key = self._key(endpoint, schema_type)
+            return _SCHEMA_STORE[key][version]
         except KeyError as e:
-            raise SchemaNotFoundError(f"Schema not found for {endpoint} {version}") from e
+            raise SchemaNotFoundError(f"Schema not found for {schema_type}:{endpoint} {version}") from e
 
-    def _validator(self, endpoint: str, version: str = "v1") -> Draft7Validator:
+    def _validator(self, endpoint: str, version: str = "v1", schema_type: str = "REQ") -> Draft7Validator:
         try:
-            return _VALIDATORS[endpoint][version]
+            key = self._key(endpoint, schema_type)
+            return _VALIDATORS[key][version]
         except KeyError as e:
-            raise SchemaNotFoundError(f"Validator not found for {endpoint} {version}") from e
+            raise SchemaNotFoundError(f"Validator not found for {schema_type}:{endpoint} {version}") from e
 
     @staticmethod
     def _now_utc_iso() -> str:
@@ -114,7 +123,7 @@ class SchemaRegistry:
         On failure -> (False, FIRE-422 dict).
         """
         try:
-            validator = self._validator(f"POST {endpoint.split(' ',1)[1]}", version) if endpoint.startswith("GET ") else self._validator(endpoint, version)
+            validator = self._validator(f"POST {endpoint.split(' ',1)[1]}", version, "REQ") if endpoint.startswith("GET ") else self._validator(endpoint, version, "REQ")
         except SchemaNotFoundError:
             # Treat missing schema as server issue; return generic 422 shape (still helpful to client)
             return False, self._shape_fire_422(field="__root__", constraint="schema_exists", expected=f"{endpoint} {version}", code_suffix="SCHEMA_MISSING", message="Schema not found", request_id=request_id)
@@ -149,11 +158,12 @@ class SchemaRegistry:
         Should NOT block responses (middleware logs only).
         """
         try:
-            validator = self._validator(endpoint, version)
+            validator = self._validator(endpoint, version, "RESP")
         except SchemaNotFoundError:
             return True  # don't punish response path for missing schema
         return Draft7Validator.is_valid(validator.schema, instance=data) or (len(list(validator.iter_errors(data))) == 0)
 
     def list_schemas(self) -> List[str]:
-        return sorted(_SCHEMA_STORE.keys())
+        # Return only request endpoints (user-facing)
+        return sorted([k.replace("REQ:", "") for k in _SCHEMA_STORE.keys() if k.startswith("REQ:")])
 

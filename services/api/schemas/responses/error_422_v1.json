@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fire-ai/schemas/responses/error_422_v1.json",
+  "title": "FIRE-422 Validation Error Response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "error_code": {
+      "type": "string",
+      "pattern": "^FIRE-422-[A-Z_]+$",
+      "description": "Error code in format FIRE-422-<SUFFIX>",
+      "examples": ["FIRE-422-TYPE_MISMATCH", "FIRE-422-MISSING_FIELD", "FIRE-422-VALIDATION_FAILED"]
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable error message"
+    },
+    "details": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "field": {
+          "type": "string",
+          "description": "The field that failed validation"
+        },
+        "constraint": {
+          "type": "string",
+          "description": "The constraint that was violated (e.g., 'type', 'required', 'pattern')"
+        },
+        "provided_value": {
+          "description": "The value that was provided (optional)"
+        },
+        "expected": {
+          "type": "string",
+          "description": "Expected value or type (optional)"
+        }
+      },
+      "required": ["field", "constraint"]
+    },
+    "transaction_id": { "$ref": "https://fire-ai/schemas/common/base.json#/definitions/transaction_id" },
+    "timestamp": { "$ref": "https://fire-ai/schemas/common/base.json#/definitions/timestamp" },
+    "request_id": {
+      "type": "string",
+      "description": "Request ID from x-request-id header or 'req-unknown'"
+    }
+  },
+  "required": ["error_code", "message", "details", "transaction_id", "timestamp", "request_id"],
+  "description": "FM-ENH-001 FIRE-422 error response contract; TDD v4.0 §11.5."
+}
+

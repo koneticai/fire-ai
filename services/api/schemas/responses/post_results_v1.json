@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fire-ai/schemas/responses/post_results_v1.json",
+  "title": "POST /results Response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "result_id": {
+      "type": "string",
+      "description": "Unique identifier for the created result"
+    },
+    "student_id": {
+      "type": "string",
+      "description": "Echo of student identifier from request"
+    },
+    "assessment_id": {
+      "type": "string",
+      "description": "Echo of assessment identifier from request"
+    },
+    "score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Echo of score from request"
+    },
+    "completed_at": { "$ref": "https://fire-ai/schemas/common/base.json#/definitions/timestamp" },
+    "created_at": { "$ref": "https://fire-ai/schemas/common/base.json#/definitions/timestamp" },
+    "transaction_id": { "$ref": "https://fire-ai/schemas/common/base.json#/definitions/transaction_id" }
+  },
+  "required": ["result_id", "student_id", "assessment_id", "score", "completed_at", "created_at", "transaction_id"],
+  "description": "FM-ENH-001 success response contract for POST /results; TDD v4.0 §11.5."
+}
+
