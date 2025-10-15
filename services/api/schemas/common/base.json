@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fire-ai/schemas/common/base.json",
+  "title": "Fire-AI Common Definitions",
+  "type": "object",
+  "definitions": {
+    "timestamp": {
+      "type": "string",
+      "description": "ISO 8601 UTC timestamp",
+      "pattern": "^(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z)$",
+      "examples": ["2025-10-14T10:30:00Z"]
+    },
+    "uuid": {
+      "type": "string",
+      "description": "UUID v4",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    },
+    "transaction_id": {
+      "type": "string",
+      "description": "FIRE transaction id",
+      "pattern": "^FIRE-\\d{8}-\\d{6}-[0-9a-fA-F]{8}$",
+      "examples": ["FIRE-20251014-103000-550e8400"]
+    },
+    "error_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "error_code": {"type": "string"},
+        "message": {"type": "string"},
+        "details": {"type": "object"},
+        "transaction_id": {"$ref": "#/definitions/transaction_id"}
+      },
+      "required": ["error_code", "message", "details", "transaction_id"]
+    },
+    "pagination": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "page": {"type": "integer", "minimum": 1},
+        "page_size": {"type": "integer", "minimum": 1, "maximum": 200},
+        "total": {"type": "integer", "minimum": 0}
+      },
+      "required": ["page", "page_size", "total"]
+    }
+  },
+  "description": "Common JSON Schema v7 components for Fire-AI per TDD v4.0 §11.5."
+}

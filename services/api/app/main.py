@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Response, status
 from typing import Dict
 from contextlib import asynccontextmanager
+from schemas.registry import SchemaRegistry
 
 READY = {"ok": True}
 
@@ -15,6 +16,16 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Fire-AI API", version="0.1.0", lifespan=lifespan)
+
+# Initialize schema registry (respects FIRE_SCHEMA_SOURCE env var)
+# No behavior change if DynamoDB table is empty - falls back to local schemas
+schema_registry = SchemaRegistry()
+
+# Schema validation middleware can be added here when needed:
+# app.add_middleware(
+#     SchemaValidationMiddleware,
+#     registry=schema_registry
+# )
 
 
 @app.get("/healthz")

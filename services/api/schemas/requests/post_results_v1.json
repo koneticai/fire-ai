@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fire-ai/schemas/requests/post_results_v1.json",
+  "title": "POST /results Request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "student_id": {
+      "type": "string",
+      "maxLength": 50,
+      "description": "Required student identifier (≤50 chars)."
+    },
+    "assessment_id": {
+      "type": "string",
+      "maxLength": 50,
+      "description": "Required assessment identifier (≤50 chars)."
+    },
+    "score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Score between 0 and 100 inclusive."
+    },
+    "completed_at": { "$ref": "https://fire-ai/schemas/common/base.json#/definitions/timestamp" },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "duration_seconds": { "type": "integer", "minimum": 0 },
+        "device_type": { "type": "string", "enum": ["web", "mobile", "tablet"] },
+        "ip_address": { "type": "string", "format": "ipv4" }
+      }
+    }
+  },
+  "required": ["student_id", "assessment_id", "score", "completed_at"],
+  "examples": [
+    {
+      "student_id": "ST123456",
+      "assessment_id": "ASSESS-2025-001",
+      "score": 87.5,
+      "completed_at": "2025-10-14T10:30:00Z",
+      "metadata": { "duration_seconds": 1800, "device_type": "web" }
+    }
+  ],
+  "description": "FM-ENH-001 request contract; TDD v4.0 §11.5."
+}

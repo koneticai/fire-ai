@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Fire-AI | FM-ENH-001 | Schema Registry - DynamoDB Table (Schema Versions)
+
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+  TableName:
+    Type: String
+    Default: fire-ai-schema-versions
+  BillingMode:
+    Type: String
+    Default: PAY_PER_REQUEST
+    AllowedValues: [PROVISIONED, PAY_PER_REQUEST]
+  PointInTimeRecovery:
+    Type: String
+    Default: ENABLED
+    AllowedValues: [ENABLED, DISABLED]
+  KmsKeyArn:
+    Type: String
+    Default: ""
+
+Conditions:
+  UseKms: !Not [!Equals [!Ref KmsKeyArn, ""]]
+  PITREnabled: !Equals [!Ref PointInTimeRecovery, ENABLED]
+
+Resources:
+  SchemaVersionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName
+      BillingMode: !Ref BillingMode
+      SSESpecification:
+        SSEEnabled: true
+        KMSMasterKeyId: !If [UseKms, !Ref KmsKeyArn, !Ref "AWS::NoValue"]
+        SSEType: KMS
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: !If [PITREnabled, true, false]
+      AttributeDefinitions:
+        - AttributeName: endpoint       # e.g. "POST /results"
+          AttributeType: S
+        - AttributeName: version        # e.g. "v1"
+          AttributeType: S
+        - AttributeName: is_active      # "1" or "0"
+          AttributeType: S
+      KeySchema:
+        - AttributeName: endpoint
+          KeyType: HASH
+        - AttributeName: version
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: gsi_active_by_endpoint
+          KeySchema:
+            - AttributeName: endpoint
+              KeyType: HASH
+            - AttributeName: is_active
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: false
+      Tags:
+        - Key: env
+          Value: !Ref Env
+        - Key: component
+          Value: schema-registry
+
+Outputs:
+  TableNameOut:
+    Value: !Ref TableName
+    Export:
+      Name: !Sub "${AWS::StackName}::SchemaVersionsTable"
+
