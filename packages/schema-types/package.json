@@ -1,0 +1,23 @@
+{
+  "name": "@fire-ai/schema-types",
+  "version": "1.0.0",
+  "description": "Auto-generated TypeScript types from JSON Schema v7 (FM-ENH-001)",
+  "main": "dist/index.d.ts",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*.d.ts"
+  ],
+  "scripts": {
+    "build": "echo 'Types are generated via root npm run generate:types'",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "fire-ai",
+    "schema",
+    "types",
+    "json-schema"
+  ],
+  "license": "UNLICENSED",
+  "private": true
+}
+

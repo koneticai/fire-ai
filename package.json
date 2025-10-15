@@ -1,0 +1,19 @@
+{
+  "name": "fire-ai-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "generate:types": "node tools/types/gen-types.mjs",
+    "check:types:clean": "git diff --exit-code packages/schema-types/dist || (echo '❌ Generated types are out of sync! Run: npm run generate:types' && exit 1)",
+    "prepare": "husky install || true",
+    "postinstall": "npm run generate:types"
+  },
+  "devDependencies": {
+    "husky": "^8.0.3"
+  }
+}
+

@@ -1,0 +1,31 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Running pre-commit checks for FM-ENH-001..."
+
+# Check if any schema files changed
+SCHEMA_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep "services/api/schemas/.*\.json$" || true)
+
+if [ -n "$SCHEMA_FILES" ]; then
+  echo "📋 Schema changes detected, regenerating TypeScript types..."
+  
+  # Regenerate types
+  npm run generate:types
+  
+  # Check if types are now clean
+  if ! git diff --exit-code packages/schema-types/dist; then
+    echo "✅ TypeScript types updated"
+    # Stage the generated types
+    git add packages/schema-types/dist/
+  fi
+else
+  echo "ℹ️  No schema changes detected"
+fi
+
+# Verify MPKF commit format (run existing validation)
+if [ -f scripts/validate-mpkf.sh ]; then
+  ./scripts/validate-mpkf.sh
+fi
+
+exit 0
+
