@@ -2,75 +2,121 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [main, develop, "enhancement/**", "feature/**", "fix/**"]
+    branches:
+      - enhancement/FM-ENH-001-schema-registry
   pull_request:
-    branches: [main, develop]
+
+env:
+  PYTHON_VERSION: "3.11"
+  POETRY_VERSION: "1.8.3"
+  WORKDIR_PY: services/api
+  PYTHONPATH: "${{ github.workspace }}/services/api/src:${{ github.workspace }}/services/api"
+  BUILD_GO: "auto"
 
 jobs:
   lint-python:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: services/api
+        working-directory: ${{ env.WORKDIR_PY }}
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      
+          python-version: ${{ env.PYTHON_VERSION }}
+
       - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-      
+        run: pipx install poetry==${{ env.POETRY_VERSION }}
+
+      - name: Cache Poetry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pypoetry
+          key: poetry-${{ runner.os }}-${{ hashFiles('services/api/poetry.lock') }}
+
       - name: Install dependencies
-        run: poetry install
-      
-      - name: Lint with pylint
-        run: poetry run pylint src/app --exit-zero
+        env:
+          POETRY_VIRTUALENVS_IN_PROJECT: "true"
+        run: poetry install --no-interaction --no-ansi
+
+      - name: Lint (pylint non-blocking)
+        continue-on-error: true
+        env:
+          PYTHONPATH: ${{ env.PYTHONPATH }}
+        run: poetry run pylint --exit-zero app schemas src
 
   test-python:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: services/api
+        working-directory: ${{ env.WORKDIR_PY }}
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      
+          python-version: ${{ env.PYTHON_VERSION }}
+
       - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-      
-      - name: Install dependencies
-        run: poetry install
-      
-      - name: Run tests
-        run: poetry run pytest --cov=src --cov-report=json --cov-report=term
-      
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        run: pipx install poetry==${{ env.POETRY_VERSION }}
+
+      - name: Cache Poetry
+        uses: actions/cache@v4
         with:
-          files: ./services/api/coverage.json
-          flags: python
+          path: ~/.cache/pypoetry
+          key: poetry-${{ runner.os }}-${{ hashFiles('services/api/poetry.lock') }}
+
+      - name: Install dependencies
+        env:
+          POETRY_VIRTUALENVS_IN_PROJECT: "true"
+        run: poetry install --no-interaction --no-ansi
+
+      - name: Run tests
+        env:
+          PYTHONPATH: ${{ env.PYTHONPATH }}
+          AWS_EC2_METADATA_DISABLED: "true"
+        run: |
+          poetry run pytest --maxfail=1 --disable-warnings \
+            --cov=app --cov=schemas --cov=src --cov-report=term-missing
+
+  security-scan:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.WORKDIR_PY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        run: pipx install poetry==${{ env.POETRY_VERSION }}
+
+      - name: Export requirements
+        run: |
+          poetry export -f requirements.txt --without-hashes -o requirements.txt
+          python -m pip install --upgrade pip safety
+
+      - name: Safety check (non-blocking)
         continue-on-error: true
+        run: safety check -r requirements.txt --full-report
 
   build-go:
+    if: ${{ env.BUILD_GO != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
-      
+          go-version: "1.22.x"
+
       - name: Detect Go service path
         id: gosvc
         run: |
@@ -81,40 +127,15 @@ jobs:
           else
             echo "path=" >> "$GITHUB_OUTPUT"
           fi
-      
-      - name: Build Go service (if present)
+
+      - name: Build Go service
         if: steps.gosvc.outputs.path != ''
         run: cd "${{ steps.gosvc.outputs.path }}" && go build -v ./...
-      
-      - name: Test Go service (if present)
+
+      - name: Test Go service
         if: steps.gosvc.outputs.path != ''
         run: cd "${{ steps.gosvc.outputs.path }}" && go test -v ./...
-      
-      - name: Note - Go service not present (skip)
-        if: steps.gosvc.outputs.path == ''
-        run: echo "No Go service directory found. Skipping Go build/test."
 
-  security-scan:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/api
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-      
-      - name: Install safety
-        run: pip install safety
-      
-      - name: Security check
-        run: poetry export -f requirements.txt | safety check --stdin
-        continue-on-error: true
+      - name: Skip Go build (not present)
+        if: steps.gosvc.outputs.path == ''
+        run: echo "No Go service found; skipping build/test."
