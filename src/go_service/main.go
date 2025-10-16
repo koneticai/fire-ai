@@ -10,6 +10,8 @@ import (
         "log"
         "net/http"
         "os"
+        "runtime"
+        "runtime/debug"
         "time"
 
         "github.com/golang-jwt/jwt/v5"
@@ -17,6 +19,7 @@ import (
         "github.com/jackc/pgx/v5"
         "github.com/jackc/pgx/v5/pgxpool"
         "github.com/google/uuid"
+        _ "net/http/pprof" // Import pprof for profiling endpoints
 )
 
 // CRDT payload structure for distributed session data
@@ -471,6 +474,34 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
         })
 }
 
+// Memory stats handler for performance monitoring
+func memoryStatsHandler(w http.ResponseWriter, r *http.Request) {
+        var m runtime.MemStats
+        runtime.ReadMemStats(&m)
+        
+        stats := map[string]interface{}{
+                "alloc_mb":         bToMb(m.Alloc),
+                "total_alloc_mb":   bToMb(m.TotalAlloc),
+                "sys_mb":           bToMb(m.Sys),
+                "num_gc":           m.NumGC,
+                "gc_cpu_fraction":  m.GCCPUFraction,
+                "heap_alloc_mb":    bToMb(m.HeapAlloc),
+                "heap_sys_mb":      bToMb(m.HeapSys),
+                "heap_idle_mb":     bToMb(m.HeapIdle),
+                "heap_inuse_mb":    bToMb(m.HeapInuse),
+                "num_goroutines":   runtime.NumGoroutine(),
+                "timestamp":        time.Now().UTC().Format(time.RFC3339),
+        }
+        
+        w.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(w).Encode(stats)
+}
+
+// Convert bytes to megabytes
+func bToMb(b uint64) float64 {
+        return float64(b) / 1024 / 1024
+}
+
 func main() {
         // Initialize database connection
         if err := initDB(); err != nil {
@@ -483,12 +514,23 @@ func main() {
 
         // Health endpoint (no authentication required)
         router.HandleFunc("/health", healthHandler).Methods("GET")
+        
+        // Memory stats endpoint for performance monitoring
+        router.HandleFunc("/memory", memoryStatsHandler).Methods("GET")
 
         // Protected endpoints with JWT middleware
         router.HandleFunc("/v1/evidence", validateInternalJWT(handleEvidence)).Methods("POST")
         router.HandleFunc("/v1/tests/sessions/{session_id}/results", validateInternalJWT(handleCRDTResults)).Methods("POST")
 
-        // Start server
+        // Start profiling server on port 6060
+        go func() {
+                log.Println("pprof profiling server starting on :6060")
+                if err := http.ListenAndServe(":6060", nil); err != nil {
+                        log.Printf("pprof server error: %v", err)
+                }
+        }()
+
+        // Start main server
         port := ":9091"
         log.Printf("Go performance service starting on port %s", port)
 

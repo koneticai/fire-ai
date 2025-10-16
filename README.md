@@ -42,6 +42,59 @@ The API will be available at `http://localhost:5000`.
 - **Unit/Integration Tests:** `poetry run pytest`
 - **Load Tests:** `poetry run locust -f tests/load/locustfile.py`
 
+## 📊 Performance Testing (FM-ENH-005)
+
+The platform includes comprehensive performance testing capabilities to validate 100k req/day scale (5x current target).
+
+### Quick Start
+```bash
+# Run all performance tests
+./services/api/tests/performance/run_all_tests.sh all
+
+# Run specific test
+./services/api/tests/performance/run_all_tests.sh peak
+
+# Analyze results
+python3 services/api/tests/performance/analyze_results.py ./services/api/tests/performance/results
+```
+
+### Test Scenarios
+
+| Test | Description | Users | Duration | Target |
+|------|-------------|-------|----------|---------|
+| **Sustained** | Memory leaks, connection stability | 5 | 4h | 4,800 requests |
+| **Peak** | p95 latency <300ms validation | 50 | 1h | 120,000 requests |
+| **Spike** | Aurora auto-scaling validation | 200 | 5m | 10,000 requests |
+| **CRDT Stress** | Zero data loss validation | 1000 | 10m | 1000+ conflicts |
+
+### Environment Variables Required
+```bash
+export FASTAPI_BASE_URL="http://localhost:8080"
+export GO_SERVICE_URL="http://localhost:9091"
+export DATABASE_URL="postgresql://user:pass@host:port/db"
+export INTERNAL_JWT_SECRET_KEY="your-secret-key"
+```
+
+### Acceptance Criteria
+- ✅ P95 latency <300ms at 100k req/day
+- ✅ Zero data loss in CRDT conflicts (1000+ concurrent)
+- ✅ Aurora auto-scales automatically (2 ACU → 16 ACU)
+- ✅ Go service memory <512MB under sustained load
+
+### Performance Monitoring
+The Go service includes built-in profiling endpoints:
+- **Memory Stats:** `GET http://localhost:9091/memory`
+- **pprof Profiling:** `http://localhost:6060/debug/pprof/`
+- **Health Check:** `GET http://localhost:9091/health`
+
+### Results and Reports
+- **Locust Reports:** HTML reports generated in `results/` directory
+- **Performance Analysis:** Automated analysis with charts and metrics
+- **Profiling Data:** Go service memory and CPU profiles
+- **Aurora Documentation:** Scaling expectations and migration guidance
+
+For detailed performance analysis and Aurora migration planning, see `docs/performance/FM-ENH-005-report-template.md`.
+
 ## 📄 API Documentation
 Once the application is running, full interactive API documentation is available at [/docs](http://localhost:5000/docs).
 
