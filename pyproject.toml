@@ -23,6 +23,7 @@ pandas = "^2.3.2"
 pyjwt = "^2.10.1"
 opentelemetry-instrumentation-fastapi = "^0.58b0"
 asyncpg = "^0.30.0"
+boto3 = "^1.35.0"
 
 [tool.poetry.group.dev.dependencies]
 pact-python = "^2.1.0"
@@ -31,6 +32,8 @@ toxiproxy-python = "^1.0.2"
 pytest = "^8.2.2"
 pytest-asyncio = "^0.21.0"
 locust = "2.28.0"
+matplotlib = "^3.8.0"
+psutil = "^5.9.0"
 
 [build-system]
 requires = ["poetry-core"]

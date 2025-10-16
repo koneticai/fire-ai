@@ -3,7 +3,7 @@ SQLAlchemy model for Evidence
 """
 
 import uuid
-from sqlalchemy import Column, String, DateTime, ForeignKey, Text
+from sqlalchemy import Column, String, DateTime, ForeignKey, Text, Boolean
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -69,8 +69,34 @@ class Evidence(Base):
         doc="When the evidence was created/uploaded"
     )
     
+    # Flag columns for soft-delete functionality
+    flagged_for_review = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default='false',
+        doc="Flag indicating if evidence is flagged for review (soft-delete)"
+    )
+    flag_reason = Column(
+        Text,
+        nullable=True,
+        doc="Reason for flagging the evidence for review"
+    )
+    flagged_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        doc="Timestamp when evidence was flagged for review"
+    )
+    flagged_by = Column(
+        UUID(as_uuid=True),
+        ForeignKey('users.id'),
+        nullable=True,
+        doc="User who flagged the evidence for review"
+    )
+    
     # Relationships
     test_session = relationship("TestSession", back_populates="evidence")
+    flagged_by_user = relationship("User", foreign_keys=[flagged_by])
     
     def __repr__(self):
         return f"<Evidence(id={self.id}, type='{self.evidence_type}', session={self.session_id})>"

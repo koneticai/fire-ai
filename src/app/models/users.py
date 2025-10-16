@@ -81,6 +81,9 @@ class User(Base):
     # Relationships
     buildings = relationship("Building", foreign_keys="Building.owner_id")
     test_sessions = relationship("TestSession", foreign_keys="TestSession.created_by")
+    created_defects = relationship("Defect", foreign_keys="Defect.created_by", back_populates="created_by_user")
+    acknowledged_defects = relationship("Defect", foreign_keys="Defect.acknowledged_by", back_populates="acknowledged_by_user")
+    flagged_evidence = relationship("Evidence", foreign_keys="Evidence.flagged_by", back_populates="flagged_by_user")
     
     def __repr__(self):
         return f"<User(id={self.id}, username='{self.username}', active={self.is_active})>"

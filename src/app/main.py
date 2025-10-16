@@ -181,6 +181,7 @@ async def root():
             "evidence": "/v1/evidence",
             "test_results": "/v1/tests/sessions/{session_id}/results",
             "test_sessions": "/v1/tests/sessions",
+            "defects": "/v1/defects",
             "classification": "/v1/classify",
             "rules": "/v1/rules",
             "docs": "/docs",
@@ -214,7 +215,7 @@ async def go_service_health():
 # REMOVED: Duplicate app-level route - handled by test_sessions router
 
 # Import and include routers
-from .routers import rules, auth, rules_versioned, classify, users, evidence, test_results, rtl, buildings, test_sessions
+from .routers import rules, auth, rules_versioned, classify, users, evidence, test_results, rtl, buildings, test_sessions, defects
 
 # Add standardized error handling
 from fastapi import Request
@@ -244,6 +245,7 @@ app.include_router(auth.router, prefix="/v1/auth")
 app.include_router(rtl.router)  # RTL router has its own prefix (/v1/auth)
 app.include_router(buildings.router)  # Buildings router has its own prefix (/v1/buildings)
 app.include_router(test_sessions.router)  # Test sessions router has its own prefix (/v1/tests/sessions)
+app.include_router(defects.router)  # Defects router has its own prefix (/v1/defects)
 app.include_router(evidence.router)  # Evidence router has its own prefix
 # app.include_router(test_results.router)  # REMOVED: Duplicate route conflict with test_sessions
 app.include_router(rules.router, prefix="/v1/rules")
