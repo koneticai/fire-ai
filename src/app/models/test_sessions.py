@@ -95,6 +95,11 @@ class TestSession(Base):
         back_populates="test_session",
         cascade="all, delete-orphan"
     )
+    defects = relationship(
+        "Defect", 
+        back_populates="test_session",
+        cascade="all, delete-orphan"
+    )
     
     def __repr__(self):
         return f"<TestSession(id={self.id}, name='{self.session_name}', status='{self.status}')>"

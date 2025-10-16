@@ -67,6 +67,11 @@ class Building(Base):
         back_populates="building",
         cascade="all, delete-orphan"
     )
+    defects = relationship(
+        "Defect", 
+        back_populates="building",
+        cascade="all, delete-orphan"
+    )
     
     def __repr__(self):
         return f"<Building(id={self.id}, name='{self.name}', type='{self.building_type}')>"
