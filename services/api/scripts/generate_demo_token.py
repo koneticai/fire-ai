@@ -31,8 +31,6 @@ def generate_demo_token():
         "sub": "demo-user",                    # Subject (username)
         "user_id": demo_user_id,               # User ID (required by backend)
         "jti": demo_jti,                       # JWT ID (for revocation tracking)
-        "aud": "fire-ai-api",                  # Audience
-        "iss": "fire-ai-auth",                 # Issuer
         "exp": int(exp.timestamp()),           # Expiration (24 hours)
         "iat": int(now.timestamp()),           # Issued at
     }
@@ -49,8 +47,6 @@ def generate_demo_token():
     print(f"  User:       {payload['sub']}")
     print(f"  User ID:    {payload['user_id']}")
     print(f"  JWT ID:     {payload['jti']}")
-    print(f"  Audience:   {payload['aud']}")
-    print(f"  Issuer:     {payload['iss']}")
     print(f"  Issued:     {now.strftime('%Y-%m-%d %H:%M:%S UTC')}")
     print(f"  Expires:    {exp.strftime('%Y-%m-%d %H:%M:%S UTC')}")
     print(f"  Valid for:  24 hours")

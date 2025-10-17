@@ -20,10 +20,15 @@ This demo showcases the core functionality of the FIRE-AI backend with pre-seede
 # Check your current JWT_SECRET_KEY
 echo $JWT_SECRET_KEY
 
-# If using the FireMode Backend workflow, use the key from the workflow config:
-export JWT_SECRET_KEY="63181718e4df31f152a20da4502d844b0ced3041a561480f2071321a4006c39e"
+# IMPORTANT: Use the JWT secret that matches your running server
+# To find the correct secret, run:
+python3 -c "import sys; sys.path.insert(0, 'src'); from app.config import settings; print(f'Server JWT Secret: {settings.jwt_secret_key}')"
 
-# Or get it from your server's environment/config
+# Common Replit secret (check your Secrets tab):
+export JWT_SECRET_KEY="ceff018d778c69512e3c81f8336016f09878276802bcdf1b4ca7b9b32ac9a3d3"
+
+# Or workflow config secret:
+# export JWT_SECRET_KEY="63181718e4df31f152a20da4502d844b0ced3041a561480f2071321a4006c39e"
 ```
 
 ### 2. Generate JWT Token
