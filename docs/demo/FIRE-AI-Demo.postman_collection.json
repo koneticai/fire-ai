@@ -1,0 +1,213 @@
+{
+  "info": {
+    "name": "FIRE-AI Demo Collection",
+    "description": "Investor demo API collection for FIRE-AI Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": ["{{base_url}}"],
+          "path": ["health"]
+        },
+        "description": "Check if the API is running (no authentication required)"
+      },
+      "response": []
+    },
+    {
+      "name": "2. List Buildings",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/buildings/",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "buildings", ""]
+        },
+        "description": "List all buildings in the portfolio"
+      },
+      "response": []
+    },
+    {
+      "name": "3. Get Building B Evidence",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/evidence/session/{{session_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "evidence", "session", "{{session_id}}"]
+        },
+        "description": "Get evidence for Building B (Good - 62% compliance). First get session_id from test sessions."
+      },
+      "response": []
+    },
+    {
+      "name": "4. Get Evidence Details",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/evidence/{{evidence_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "evidence", "{{evidence_id}}"]
+        },
+        "description": "Get detailed information about a specific evidence item"
+      },
+      "response": []
+    },
+    {
+      "name": "5. Get Building C Open Defects",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/defects/buildings/{{building_c_id}}/defects?status=open",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "defects", "buildings", "{{building_c_id}}", "defects"],
+          "query": [
+            {
+              "key": "status",
+              "value": "open"
+            }
+          ]
+        },
+        "description": "Get open defects for Building C (Poor - 45% compliance)"
+      },
+      "response": []
+    },
+    {
+      "name": "6. Get Defect Details",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/defects/{{defect_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "defects", "{{defect_id}}"]
+        },
+        "description": "Get detailed information about a specific defect"
+      },
+      "response": []
+    },
+    {
+      "name": "7. Link Evidence to Defect",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"defect_id\": \"{{defect_id}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/evidence/{{evidence_id}}/link-defect",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "evidence", "{{evidence_id}}", "link-defect"]
+        },
+        "description": "Link evidence to a defect for compliance tracking"
+      },
+      "response": []
+    },
+    {
+      "name": "8. Update Defect Status",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"acknowledged\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/v1/defects/{{defect_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "defects", "{{defect_id}}"]
+        },
+        "description": "Update defect status to 'acknowledged'"
+      },
+      "response": []
+    },
+    {
+      "name": "Helper: List Test Sessions",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/tests/sessions/?limit=100",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "tests", "sessions", ""],
+          "query": [
+            {
+              "key": "limit",
+              "value": "100"
+            }
+          ]
+        },
+        "description": "Helper endpoint to find session IDs for buildings"
+      },
+      "response": []
+    }
+  ]
+}
