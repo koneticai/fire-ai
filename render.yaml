@@ -3,7 +3,7 @@ services:
     name: fire-ai-api
     env: python
     region: oregon
-    buildCommand: cd services/api && poetry install
+    buildCommand: poetry install
     startCommand: bash run.sh
     plan: free
     envVars:
