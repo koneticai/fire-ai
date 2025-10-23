@@ -5,7 +5,8 @@ Configuration management for device attestation service.
 import os
 import logging
 from typing import Optional
-from pydantic import BaseSettings, Field
+from pydantic_settings import BaseSettings
+from pydantic import Field
 
 logger = logging.getLogger(__name__)
 

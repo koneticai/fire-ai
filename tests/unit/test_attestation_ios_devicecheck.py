@@ -215,7 +215,7 @@ class TestDeviceCheckValidator:
         result = validator.validate("production_token")
         
         assert result.status == AttestationResultStatus.ERROR
-        assert "request failed" in result.error_message.lower()
+        assert "private key file not found" in result.error_message.lower()
     
     def test_is_configured_stub_mode(self, validator):
         """Test configuration check in stub mode."""

@@ -9,7 +9,7 @@ import json
 import logging
 from typing import Optional, Dict, Any
 import jwt
-from datetime import datetime
+from datetime import datetime, timedelta
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.exceptions import InvalidSignature

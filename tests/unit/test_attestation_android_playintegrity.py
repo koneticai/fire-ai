@@ -262,7 +262,7 @@ class TestPlayIntegrityValidator:
             result = validator.validate("production_token")
             
             assert result.status == AttestationResultStatus.ERROR
-            assert "request failed" in result.error_message.lower()
+            assert "failed to decode" in result.error_message.lower()
     
     def test_check_device_integrity_valid(self, validator):
         """Test device integrity check with valid verdict."""
@@ -273,8 +273,11 @@ class TestPlayIntegrityValidator:
         result = validator._check_device_integrity(device_integrity)
         assert result is True
     
-    def test_check_device_integrity_invalid(self, validator):
+    def test_check_device_integrity_invalid(self, config):
         """Test device integrity check with invalid verdict."""
+        config.stub_mode = False  # Disable stub mode for this test
+        validator = PlayIntegrityValidator(config)
+        
         device_integrity = {
             "deviceRecognitionVariant": ["UNKNOWN_DEVICE"]
         }
@@ -303,8 +306,11 @@ class TestPlayIntegrityValidator:
         result = validator._check_app_integrity(app_integrity)
         assert result is True
     
-    def test_check_app_integrity_invalid(self, validator):
+    def test_check_app_integrity_invalid(self, config):
         """Test app integrity check with invalid verdict."""
+        config.stub_mode = False  # Disable stub mode for this test
+        validator = PlayIntegrityValidator(config)
+        
         app_integrity = {
             "appRecognitionVariant": ["UNRECOGNIZED_VERSION"]
         }

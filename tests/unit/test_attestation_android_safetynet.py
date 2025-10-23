@@ -84,17 +84,15 @@ class TestSafetyNetValidator:
         assert result.metadata["stub_mode"] is True
     
     @patch('src.app.services.attestation.android_safetynet.jwt.get_unverified_header')
-    @patch('src.app.services.attestation.android_safetynet.jwt.get_unverified_claims')
     @patch('src.app.services.attestation.android_safetynet.jwt.decode')
-    def test_validate_production_success(self, mock_jwt_decode, mock_jwt_claims, mock_jwt_header, config):
+    def test_validate_production_success(self, mock_jwt_decode, mock_jwt_header, config):
         """Test production validation with successful response."""
         # Configure for production mode
         config.stub_mode = False
         validator = SafetyNetValidator(config)
         
-        # Mock JWT header and claims
+        # Mock JWT header
         mock_jwt_header.return_value = {"kid": "test_key_id"}
-        mock_jwt_claims.return_value = {"iss": "google"}
         
         # Mock JWT decode with valid payload
         current_time = datetime.utcnow()
@@ -117,17 +115,15 @@ class TestSafetyNetValidator:
             assert "safetynet_payload" in result.metadata
     
     @patch('src.app.services.attestation.android_safetynet.jwt.get_unverified_header')
-    @patch('src.app.services.attestation.android_safetynet.jwt.get_unverified_claims')
     @patch('src.app.services.attestation.android_safetynet.jwt.decode')
-    def test_validate_production_cts_profile_failed(self, mock_jwt_decode, mock_jwt_claims, mock_jwt_header, config):
+    def test_validate_production_cts_profile_failed(self, mock_jwt_decode, mock_jwt_header, config):
         """Test production validation with CTS profile failure."""
         # Configure for production mode
         config.stub_mode = False
         validator = SafetyNetValidator(config)
         
-        # Mock JWT header and claims
+        # Mock JWT header
         mock_jwt_header.return_value = {"kid": "test_key_id"}
-        mock_jwt_claims.return_value = {"iss": "google"}
         
         # Mock JWT decode with CTS profile failure
         current_time = datetime.utcnow()
@@ -150,17 +146,15 @@ class TestSafetyNetValidator:
             assert "cts profile match failed" in result.error_message.lower()
     
     @patch('src.app.services.attestation.android_safetynet.jwt.get_unverified_header')
-    @patch('src.app.services.attestation.android_safetynet.jwt.get_unverified_claims')
     @patch('src.app.services.attestation.android_safetynet.jwt.decode')
-    def test_validate_production_basic_integrity_failed(self, mock_jwt_decode, mock_jwt_claims, mock_jwt_header, config):
+    def test_validate_production_basic_integrity_failed(self, mock_jwt_decode, mock_jwt_header, config):
         """Test production validation with basic integrity failure."""
         # Configure for production mode
         config.stub_mode = False
         validator = SafetyNetValidator(config)
         
-        # Mock JWT header and claims
+        # Mock JWT header
         mock_jwt_header.return_value = {"kid": "test_key_id"}
-        mock_jwt_claims.return_value = {"iss": "google"}
         
         # Mock JWT decode with basic integrity failure
         current_time = datetime.utcnow()
@@ -183,17 +177,15 @@ class TestSafetyNetValidator:
             assert "basic integrity check failed" in result.error_message.lower()
     
     @patch('src.app.services.attestation.android_safetynet.jwt.get_unverified_header')
-    @patch('src.app.services.attestation.android_safetynet.jwt.get_unverified_claims')
     @patch('src.app.services.attestation.android_safetynet.jwt.decode')
-    def test_validate_production_expired_token(self, mock_jwt_decode, mock_jwt_claims, mock_jwt_header, config):
+    def test_validate_production_expired_token(self, mock_jwt_decode, mock_jwt_header, config):
         """Test production validation with expired token."""
         # Configure for production mode
         config.stub_mode = False
         validator = SafetyNetValidator(config)
         
-        # Mock JWT header and claims
+        # Mock JWT header
         mock_jwt_header.return_value = {"kid": "test_key_id"}
-        mock_jwt_claims.return_value = {"iss": "google"}
         
         # Mock JWT decode with expired token
         mock_jwt_decode.side_effect = jwt.ExpiredSignatureError("Token has expired")
@@ -208,16 +200,14 @@ class TestSafetyNetValidator:
             assert "signature verification failed" in result.error_message.lower()
     
     @patch('src.app.services.attestation.android_safetynet.jwt.get_unverified_header')
-    @patch('src.app.services.attestation.android_safetynet.jwt.get_unverified_claims')
-    def test_validate_production_failed_key_retrieval(self, mock_jwt_claims, mock_jwt_header, config):
+    def test_validate_production_failed_key_retrieval(self, mock_jwt_header, config):
         """Test production validation with failed key retrieval."""
         # Configure for production mode
         config.stub_mode = False
         validator = SafetyNetValidator(config)
         
-        # Mock JWT header and claims
+        # Mock JWT header
         mock_jwt_header.return_value = {"kid": "test_key_id"}
-        mock_jwt_claims.return_value = {"iss": "google"}
         
         # Mock failed key retrieval
         with patch.object(validator, '_get_google_public_key') as mock_get_key:

@@ -209,7 +209,7 @@ class TestAttestationMiddleware:
     def test_validate_attestation_platform_detection_jwt(self, middleware):
         """Test platform detection for JWT tokens."""
         # Mock JWT header
-        with patch('src.app.services.attestation.middleware.jwt.get_unverified_header') as mock_header:
+        with patch('jwt.get_unverified_header') as mock_header:
             mock_header.return_value = {"iss": "apple.com"}
             
             result = middleware.validate_attestation("eyJ.test.token", {})

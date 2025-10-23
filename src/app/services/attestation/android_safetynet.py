@@ -12,7 +12,7 @@ from typing import Optional, Dict, Any
 import httpx
 import base64
 import jwt
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from .base import AttestationValidator, AttestationResult, AttestationResultStatus
 from .config import AttestationConfig
@@ -154,7 +154,9 @@ class SafetyNetValidator(AttestationValidator):
         try:
             # Decode JWT without verification first to get header
             unverified_header = jwt.get_unverified_header(token)
-            unverified_payload = jwt.get_unverified_claims(token)
+            # Note: get_unverified_claims is not available in newer JWT versions
+            # We'll decode without verification instead
+            unverified_payload = jwt.decode(token, options={"verify_signature": False, "verify_exp": False, "verify_iat": False})
             
             # Get Google's public key for verification
             public_key = self._get_google_public_key(unverified_header.get("kid"))
