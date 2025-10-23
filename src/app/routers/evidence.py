@@ -48,13 +48,31 @@ def calculate_file_hash(file_content: bytes) -> str:
 
 
 def validate_device_attestation(headers: dict) -> bool:
-    """MVP stub - Week 4 will add DeviceCheck integration"""
+    """Validate device attestation using unified middleware"""
+    from ..services.attestation import AttestationMiddleware, AttestationConfig
+    
+    # Get attestation token from headers
     token = headers.get('X-Device-Attestation')
-    if not token or token == 'emulator':
+    if not token:
         raise HTTPException(
             status_code=422,
-            detail="ATTESTATION_FAILED: Emulator not allowed"
+            detail="ATTESTATION_FAILED: Missing X-Device-Attestation header"
         )
+    
+    # Initialize attestation middleware
+    config = AttestationConfig()
+    middleware = AttestationMiddleware(config)
+    
+    # Validate attestation
+    result = middleware.validate_attestation(token, headers)
+    
+    if not result.is_valid:
+        error_detail = f"ATTESTATION_FAILED: {result.error_message}"
+        if result.is_invalid:
+            raise HTTPException(status_code=422, detail=error_detail)
+        else:  # Error case
+            raise HTTPException(status_code=500, detail=error_detail)
+    
     return True
 
 
@@ -75,7 +93,7 @@ async def submit_evidence(
     This endpoint handles file uploads with integrity verification
     and forwards the request to the Go service for processing.
     """
-    # Validate device attestation (MVP stub)
+    # Validate device attestation
     if request:
         validate_device_attestation(request.headers)
     
