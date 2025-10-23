@@ -18,6 +18,7 @@ from ..database.core import get_db
 from ..dependencies import get_current_active_user
 from ..models.test_sessions import TestSession
 from ..schemas.auth import TokenPayload
+from ..services.baseline_validator import validate_baseline_completeness
 from pydantic import BaseModel
 
 class CRDTSubmissionRequest(BaseModel):
@@ -179,8 +180,50 @@ async def create_test_session(
     db: AsyncSession = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_active_user)
 ):
-    """Create new test session"""
+    """Create new test session with baseline validation gate"""
     from ..utils.vector_clock import VectorClock
+    
+    building_id = session_data.get('building_id')
+    if not building_id:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_code": "FIRE-400",
+                "message": "building_id is required",
+                "transaction_id": str(uuid.uuid4()),
+                "retryable": False
+            }
+        )
+    
+    # Check baseline completeness before allowing session creation
+    try:
+        completeness = await validate_baseline_completeness(building_id, db)
+        if not completeness.is_complete:
+            raise HTTPException(
+                status_code=428,
+                detail={
+                    "error_code": "FIRE-428",
+                    "message": "Building baseline incomplete - cannot create test session",
+                    "missing": [item.dict() for item in completeness.missing_items],
+                    "completeness_percentage": completeness.completeness_percentage,
+                    "transaction_id": str(uuid.uuid4()),
+                    "retryable": False
+                }
+            )
+    except HTTPException:
+        # Re-raise HTTP exceptions (including 428)
+        raise
+    except Exception as e:
+        # Handle other errors (e.g., building not found)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error_code": "FIRE-500",
+                "message": f"Failed to validate baseline: {str(e)}",
+                "transaction_id": str(uuid.uuid4()),
+                "retryable": True
+            }
+        )
     
     # Initialize vector clock for CRDT support
     vector_clock = VectorClock()
@@ -188,7 +231,7 @@ async def create_test_session(
     
     session = TestSession(
         id=uuid.uuid4(),
-        building_id=session_data.get('building_id'),
+        building_id=building_id,
         status='active',
         session_name=session_data.get('session_name', ''),
         created_by=current_user.user_id,

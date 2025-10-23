@@ -72,6 +72,27 @@ class Building(Base):
         back_populates="building",
         cascade="all, delete-orphan"
     )
+    building_configuration = relationship(
+        "BuildingConfiguration", 
+        back_populates="building",
+        cascade="all, delete-orphan",
+        uselist=False
+    )
+    baseline_pressure_differentials = relationship(
+        "BaselinePressureDifferential", 
+        back_populates="building",
+        cascade="all, delete-orphan"
+    )
+    baseline_air_velocities = relationship(
+        "BaselineAirVelocity", 
+        back_populates="building",
+        cascade="all, delete-orphan"
+    )
+    baseline_door_forces = relationship(
+        "BaselineDoorForce", 
+        back_populates="building",
+        cascade="all, delete-orphan"
+    )
     
     def __repr__(self):
         return f"<Building(id={self.id}, name='{self.name}', type='{self.building_type}')>"
