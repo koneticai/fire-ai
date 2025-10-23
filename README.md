@@ -100,12 +100,26 @@ Once the application is running, full interactive API documentation is available
 
 ## 🔐 Authentication
 
-### Getting Access Tokens
-The API uses JWT-based authentication. To access protected endpoints:
+The API uses JWT-based authentication with token revocation support. All protected endpoints require a valid JWT token.
 
-1. **Create a user account** (implementation specific)
-2. **Obtain a JWT token** by authenticating with your credentials
-3. **Use the token** in API requests
+### Generating Demo Tokens for Testing
+
+For development and demo purposes, use the token generator script:
+
+```bash
+# Set your JWT secret (must match the server's JWT_SECRET_KEY)
+export JWT_SECRET_KEY="your-secret-key-here"
+
+# Generate a 24-hour demo token
+cd services/api
+python scripts/generate_demo_token.py
+
+# Copy the token and use it in your requests
+export JWT_TOKEN="<generated-token>"
+curl -H "Authorization: Bearer $JWT_TOKEN" http://localhost:5000/v1/buildings/
+```
+
+The demo token is associated with demo user ID `00000000-0000-0000-0000-000000000001` and is valid for 24 hours.
 
 ### Using Authentication in Swagger UI
 1. Go to [/docs](http://localhost:5000/docs)
@@ -124,3 +138,9 @@ curl -H "Authorization: Bearer <your-jwt-token>" \
 **Required Headers:**
 - `Authorization: Bearer <jwt-token>` - For all protected endpoints
 - `Content-Type: application/json` - For POST/PUT requests
+
+**Token Features:**
+- JWT-based with HS256 algorithm
+- Token Revocation List (RTL) support
+- 24-hour expiration for demo tokens
+- Unique JTI (JWT ID) for each token

@@ -1,0 +1,77 @@
+TASK: Create a complete investor demo test suite for the FIRE-AI backend.
+
+CONTEXT:
+- Server running on port 5000
+- Base URL: https://f4ef6f0f-0f5d-47c0-8400-3ec5dd3e1ea5-00-1947ayqzkyfgn.picard.replit.dev:5000
+- Demo data seeded with 3 buildings (IDs from handoff doc):
+  * Building A: 88c27381-0cf2-4181-8f39-282978f6986f (Perfect - 95%)
+  * Building B: 60a03aa0-b407-4091-9e5f-8a4b51bee7b9 (Good - 62%)
+  * Building C: 63787813-0d18-487a-bfb3-0e8024dcb787 (Poor - 45%)
+
+DELIVERABLES:
+
+1. Generate a demo JWT token
+   - Create script at: services/api/scripts/generate_demo_token.py
+   - Should generate a valid JWT with:
+     * sub: "demo-user"
+     * jti: "demo-token-12345"
+     * aud: "fire-ai-api"
+     * iss: "fire-ai-auth"
+     * exp: 24 hours from now
+   - Use JWT_SECRET_KEY from environment
+   - Print the token clearly
+
+2. Create demo execution script
+   - File: docs/demo/run_investor_demo.sh
+   - Should test these endpoints in order:
+     a. GET /health (no auth)
+     b. GET /v1/buildings/ (with auth)
+     c. GET /v1/buildings/{building_b_id}/evidence (with auth)
+     d. GET /v1/evidence/{first_evidence_id} (with auth)
+     e. GET /v1/buildings/{building_c_id}/defects?status=open (with auth)
+     f. GET /v1/defects/{first_defect_id} (with auth)
+     g. POST /v1/evidence/{evidence_id}/link-defect (with auth, link to defect)
+     h. PATCH /v1/defects/{defect_id} (with auth, change status to "acknowledged")
+   - Use the base URL: https://f4ef6f0f-0f5d-47c0-8400-3ec5dd3e1ea5-00-1947ayqzkyfgn.picard.replit.dev:5000
+   - Extract IDs dynamically from responses
+   - Use python -m json.tool for formatting (jq not available)
+   - Add colored output (GREEN for steps, YELLOW for captured IDs, BLUE for headers)
+
+3. Create Postman collection
+   - File: docs/demo/FIRE-AI-Demo.postman_collection.json
+   - Include all 8 endpoints from above
+   - Use variables: {{base_url}}, {{jwt_token}}, {{building_a_id}}, etc.
+
+4. Create Postman environment
+   - File: docs/demo/FIRE-AI-Demo.postman_environment.json
+   - Set base_url to the Replit URL (port 5000)
+   - Leave jwt_token empty (to be filled after generating)
+   - Include all building IDs
+
+5. Create demo README
+   - File: docs/demo/README.md
+   - Explain how to:
+     * Generate JWT token
+     * Run the demo script
+     * Import Postman collection
+     * What each endpoint demonstrates
+   - Include expected outputs
+   - Add troubleshooting section
+
+REQUIREMENTS:
+- All scripts must be executable (chmod +x)
+- Use only tools available in Replit (no jq, use python -m json.tool)
+- Handle errors gracefully
+- Make output investor-friendly (clear, professional)
+- Test that all endpoints work before finishing
+
+VALIDATION:
+After creating files, run:
+1. Generate token script
+2. Test first 3 endpoints of demo script
+3. Confirm all files are created and properly formatted
+
+Report back with:
+- Generated JWT token
+- Success/failure of each test endpoint
+- Any issues found

@@ -1,0 +1,77 @@
+TASK: Fix authentication for FIRE-AI demo in 2 steps.
+
+CONTEXT:
+Three AI models analyzed the auth failure and identified:
+1. Demo user (ID: 00000000-0000-0000-0000-000000000001) doesn't exist in database
+2. RTL query uses wrong column name (jti vs token_jti)
+
+STEP 1: Fix RTL Column Mismatch
+File: src/app/dependencies.py
+Location: Line 34 (in get_current_active_user function)
+
+CHANGE:
+FROM: revoked = await db.execute(
+        select(TokenRevocationList).where(TokenRevocationList.jti == token_data.jti)
+      )
+TO:   revoked = await db.execute(
+        select(TokenRevocationList).where(TokenRevocationList.token_jti == token_data.jti)
+      )
+
+Explanation: Model column is "token_jti" not "jti" (see src/app/models/rtl.py line 19)
+
+STEP 2: Create Demo User in Database
+Execute this SQL via psql or database client:
+
+INSERT INTO users (
+  id, 
+  username, 
+  email, 
+  full_name_encrypted, 
+  password_hash, 
+  is_active,
+  created_at,
+  updated_at
+) VALUES (
+  '00000000-0000-0000-0000-000000000001',
+  'demo-user',
+  'demo@fire-ai.com',
+  E'\\x4465',  -- Encrypted "Demo User" placeholder
+  '$2b$12$KIXbJxW8s3nFDN7vxH4mFOqP9yJ0L3QxEwX5kF2mN8pR6tU4vW7xZ',  -- Hash of "demo123"
+  true,
+  NOW(),
+  NOW()
+);
+
+VERIFICATION STEPS:
+1. After fixing RTL column:
+   - Restart server if needed
+   - No errors in logs about AttributeError
+
+2. After creating demo user:
+   - Query: SELECT * FROM users WHERE id = '00000000-0000-0000-0000-000000000001';
+   - Should return 1 row
+
+3. Generate fresh token:
+   export JWT_SECRET_KEY="ceff018d778c69512e3c81f8336016f09878276802bcdf1b4ca7b9b32ac9a3d3"
+   python services/api/scripts/generate_demo_token.py
+
+4. Test authenticated endpoint:
+   export JWT_TOKEN="<generated-token>"
+   curl -s "https://f4ef6f0f-0f5d-47c0-8400-3ec5dd3e1ea5-00-1947ayqzkyfgn.picard.replit.dev:5000/v1/buildings/" \
+     -H "Authorization: Bearer $JWT_TOKEN" | python -m json.tool
+
+EXPECTED RESULTS:
+- Step 1: No more AttributeError in RTL check
+- Step 2: Demo user exists in database
+- Step 3: Token generated successfully
+- Step 4: 200 OK with buildings list (not 401)
+
+ROLLBACK:
+If anything breaks:
+- Step 1: git checkout src/app/dependencies.py
+- Step 2: DELETE FROM users WHERE id = '00000000-0000-0000-0000-000000000001';
+
+TIME ESTIMATE: 30 minutes total
+
+Execute both steps, then run all 4 verification tests.
+Report results for each verification step.

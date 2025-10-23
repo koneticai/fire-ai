@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: fire-ai-api
+    env: python
+    region: oregon
+    buildCommand: poetry install
+    startCommand: bash run.sh
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9

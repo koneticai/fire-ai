@@ -35,7 +35,7 @@ async def get_current_active_user(
         if token_data.jti:
             result = await db.execute(
                 select(TokenRevocationList).where(
-                    TokenRevocationList.jti == token_data.jti
+                    TokenRevocationList.token_jti == str(token_data.jti)
                 )
             )
             if result.scalar_one_or_none():
@@ -103,10 +103,20 @@ def verify_token(token: str) -> TokenPayload:
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
+        # Validate jti is a valid UUID format
+        try:
+            jti_uuid = UUID(jti) if jti else None
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token - malformed jti",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
         token_data = TokenPayload(
             username=username,
             user_id=user_uuid,
-            jti=jti,
+            jti=jti_uuid,
             exp=exp
         )
         return token_data

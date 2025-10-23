@@ -18,6 +18,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(tags=["Authentication"])
 
+@router.get("/debug/config")
+async def debug_config():
+    """Debug endpoint to verify JWT configuration"""
+    from ..config import settings
+    return {
+        "jwt_secret_loaded": bool(settings.jwt_secret_key),
+        "jwt_secret_length": len(settings.jwt_secret_key),
+        "jwt_secret_prefix": settings.jwt_secret_key[:8] + "...",
+        "algorithm": settings.algorithm
+    }
+
 @router.post("/logout", response_model=APIResponse, summary="Logout User", description="Revoke the current user's JWT token by adding it to the revocation list")
 async def logout(
     request: Request,

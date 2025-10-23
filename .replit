@@ -5,7 +5,7 @@ integrations = ["python_database:1.0.0"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["cargo", "glibcLocales", "libiconv", "libxcrypt", "openssl", "pkg-config", "postgresql", "rustc"]
+packages = ["cairo", "cargo", "ffmpeg-full", "freetype", "ghostscript", "glibcLocales", "gobject-introspection", "gtk3", "libiconv", "libxcrypt", "openssl", "pkg-config", "postgresql", "qhull", "rustc", "tcl", "tk"]
 
 [workflows]
 runButton = "Project"
@@ -24,15 +24,24 @@ name = "FireMode Backend"
 author = "agent"
 
 [workflows.workflow.metadata]
-outputType = "console"
+outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "export DATABASE_URL=\"postgresql://neondb_owner:npg_wl8kHoF3tusy@ep-small-tree-afyvcu0k.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require\" && export JWT_SECRET_KEY=\"63181718e4df31f152a20da4502d844b0ced3041a561480f2071321a4006c39e\" && export INTERNAL_JWT_SECRET_KEY=\"04379da581402f1892ad6360e74e7a1ae821d15f0103c8839721f4fc7f102d68\" && python src/app/supervisor.py"
+args = "export JWT_SECRET_KEY=\"7e65211b0d6d1bfec7c336a565e7df3110eac92b155e9c24e7f6187e06d9c071\" && export DATABASE_URL=\"postgresql://neondb_owner:npg_wl8kHoF3tusy@ep-small-tree-afyvcu0k.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require\" && export INTERNAL_JWT_SECRET_KEY=\"04379da581402f1892ad6360e74e7a1ae821d15f0103c8839721f4fc7f102d68\" && python src/app/supervisor.py"
+waitForPort = 5000
 
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 6060
+externalPort = 3002
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
 
 [[ports]]
 localPort = 9090
