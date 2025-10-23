@@ -1,0 +1,32 @@
+{
+  "brand": {
+    "name": "FIRE-AI",
+    "primary_color": "#003366",
+    "secondary_color": "#2E8B57",
+    "background_color": "#F5F5F5",
+    "accent_color": "#2E8B57",
+    "font_headline": {
+      "family": "Inter",
+      "fallback": "Helvetica Neue",
+      "weight": "700"
+    },
+    "font_body": {
+      "family": "Open Sans",
+      "fallback": "Roboto",
+      "weight": "400"
+    },
+    "button": {
+      "background": "#2E8B57",
+      "text_color": "#FFFFFF",
+      "hover_background": "#26764A",
+      "corner_radius": 16,
+      "shadow": "0 2px 4px rgba(0,0,0,0.15)"
+    },
+    "typography_scale": {
+      "headline_1": "36px",
+      "headline_2": "28px",
+      "body": "16px",
+      "caption": "13px"
+    }
+  }
+}

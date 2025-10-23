@@ -47,12 +47,24 @@ def calculate_file_hash(file_content: bytes) -> str:
     return hashlib.sha256(file_content).hexdigest()
 
 
+def validate_device_attestation(headers: dict) -> bool:
+    """MVP stub - Week 4 will add DeviceCheck integration"""
+    token = headers.get('X-Device-Attestation')
+    if not token or token == 'emulator':
+        raise HTTPException(
+            status_code=422,
+            detail="ATTESTATION_FAILED: Emulator not allowed"
+        )
+    return True
+
+
 @router.post("/submit", response_model=EvidenceResponse)
 async def submit_evidence(
     session_id: str = Form(..., description="Test session ID"),
     evidence_type: str = Form(..., description="Type of evidence (photo, video, document, etc.)"),
     file: UploadFile = File(..., description="Evidence file to upload"),
     metadata: Optional[str] = Form(None, description="Additional metadata as JSON string"),
+    request: Request = None,
     db: AsyncSession = Depends(get_db),
     current_user: TokenData = Depends(get_current_active_user),
     proxy: GoServiceProxy = Depends(get_go_service_proxy)
@@ -63,6 +75,10 @@ async def submit_evidence(
     This endpoint handles file uploads with integrity verification
     and forwards the request to the Go service for processing.
     """
+    # Validate device attestation (MVP stub)
+    if request:
+        validate_device_attestation(request.headers)
+    
     # Verify session ownership before allowing evidence submission
     result = await db.execute(
         select(TestSession).where(

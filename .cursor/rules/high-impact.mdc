@@ -1,0 +1,39 @@
+# .cursor/rules/high-impact.mdc
+---
+name: "High-Impact Workflow Rules"
+description: "The 20% of rules that deliver ~80% of the benefit."
+globs:
+  - "**/*"
+---
+
+## Workflow
+- Open a fresh chat for each task; reset when context drifts.
+- Require a **Plan → Implement → Test** loop for every change.
+- Use the Master Structured change template; return only patched hunks.
+
+## Scope & Size
+- Limit tasks to **30–75 LOC** of change.
+- Keep files ≤ **500 LOC**; split or extract when larger.
+
+## Targeting
+- Tag only the specific files needed (e.g., `@src/Feature.tsx`).
+- Co-tag the matching test file (e.g., `@tests/Feature.test.ts`).
+
+## Version Control
+- Commit after every stable change.
+- Review diffs before applying or merging.
+
+## CI Gates
+- Run CI stages in order: **Install → Lint → Typecheck → Unit → Integration → Security → Build → Preview Deploy**.
+- Block merges on failing tests, **high/critical** vulnerabilities, or budget breaches (e.g., bundle size).
+
+## Security
+- Never hardcode secrets; use environment + secret manager.
+- Validate inputs and parameterize all queries.
+
+## i18n & a11y
+- Externalize all user-visible strings (no inline literals).
+- Meet **WCAG 2.2 AA** baseline.
+
+## Documentation
+- Maintain `cursor_rules.md` and ADRs; reference them in prompts and PRs.
