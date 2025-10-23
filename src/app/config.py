@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     attestation_stub_mode: bool = True
     attestation_stub_allow_emulator: bool = False
     
+    # C&E Module Configuration
+    ce_module_enabled: bool = True
+    ce_default_standard: str = "AS1851-2012"
+    ce_workflow_timeout_days: int = 30
+    ce_auto_archive_days: int = 365
+    ce_visual_designer_max_nodes: int = 100
+    
     class Config:
         # Do NOT use .env file in production
         env_file = None
