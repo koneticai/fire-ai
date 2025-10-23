@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     
+    # Device Attestation Configuration
+    attestation_enabled: bool = True
+    attestation_stub_mode: bool = True
+    attestation_stub_allow_emulator: bool = False
+    
     class Config:
         # Do NOT use .env file in production
         env_file = None

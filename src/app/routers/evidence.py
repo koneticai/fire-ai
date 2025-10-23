@@ -8,11 +8,12 @@ for fire safety testing compliance.
 import hashlib
 import logging
 import boto3
+import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel
 from sqlalchemy import select, and_
@@ -34,6 +35,7 @@ from ..schemas.evidence import (
     EvidenceResponse
 )
 from ..proxy import get_go_service_proxy, GoServiceProxy
+from ..services.storage.worm_uploader import WormStorageUploader
 
 
 logger = logging.getLogger(__name__)
@@ -48,13 +50,31 @@ def calculate_file_hash(file_content: bytes) -> str:
 
 
 def validate_device_attestation(headers: dict) -> bool:
-    """MVP stub - Week 4 will add DeviceCheck integration"""
+    """Validate device attestation using unified middleware"""
+    from ..services.attestation import AttestationMiddleware, AttestationConfig
+    
+    # Get attestation token from headers
     token = headers.get('X-Device-Attestation')
-    if not token or token == 'emulator':
+    if not token:
         raise HTTPException(
             status_code=422,
-            detail="ATTESTATION_FAILED: Emulator not allowed"
+            detail="ATTESTATION_FAILED: Missing X-Device-Attestation header"
         )
+    
+    # Initialize attestation middleware
+    config = AttestationConfig()
+    middleware = AttestationMiddleware(config)
+    
+    # Validate attestation
+    result = middleware.validate_attestation(token, headers)
+    
+    if not result.is_valid:
+        error_detail = f"ATTESTATION_FAILED: {result.error_message}"
+        if result.is_invalid:
+            raise HTTPException(status_code=422, detail=error_detail)
+        else:  # Error case
+            raise HTTPException(status_code=500, detail=error_detail)
+    
     return True
 
 
@@ -75,7 +95,7 @@ async def submit_evidence(
     This endpoint handles file uploads with integrity verification
     and forwards the request to the Go service for processing.
     """
-    # Validate device attestation (MVP stub)
+    # Validate device attestation
     if request:
         validate_device_attestation(request.headers)
     
@@ -115,23 +135,61 @@ async def submit_evidence(
             except json.JSONDecodeError:
                 raise HTTPException(status_code=400, detail="Invalid JSON in metadata field")
         
-        # Submit to Go service
+        # Add WORM-specific metadata
+        worm_metadata = {
+            **metadata_dict,
+            "user_id": str(current_user.user_id),
+            "session_id": session_id,
+            "evidence_type": evidence_type,
+            "upload_timestamp": datetime.utcnow().isoformat(),
+            "file_hash": file_hash,
+            "original_filename": file.filename
+        }
+        
+        # Upload to WORM storage
+        worm_bucket = os.getenv('WORM_EVIDENCE_BUCKET', 'firemode-evidence-worm')
+        worm_uploader = WormStorageUploader(bucket_name=worm_bucket)
+        
+        # Generate S3 key with timestamp and hash for uniqueness
+        timestamp = datetime.utcnow().strftime("%Y/%m/%d")
+        s3_key = f"evidence/{timestamp}/{session_id}/{file_hash[:8]}_{file.filename}"
+        
+        # Upload file to WORM storage
+        s3_uri = worm_uploader.upload_with_retention(
+            file_path=file_content,
+            s3_key=s3_key,
+            metadata=worm_metadata,
+            content_type=file.content_type
+        )
+        
+        # Verify immutability
+        immutability_check = worm_uploader.verify_immutability(s3_key)
+        if not immutability_check.get('is_immutable', False):
+            logger.warning(f"WORM immutability verification failed for {s3_key}")
+        
+        # Submit to Go service with WORM storage info
         result = await proxy.submit_evidence(
             session_id=session_id,
             evidence_type=evidence_type,
             file=file,
             sha256_hash=file_hash,
             user_id=str(current_user.user_id),
-            metadata=metadata_dict
+            metadata=worm_metadata,
+            worm_storage_info={
+                "s3_uri": s3_uri,
+                "s3_key": s3_key,
+                "bucket": worm_bucket,
+                "immutability_verified": immutability_check.get('is_immutable', False)
+            }
         )
         
-        logger.info(f"Evidence submitted successfully - ID: {result.get('evidence_id')}, User: {current_user.user_id}")
+        logger.info(f"Evidence submitted to WORM storage successfully - ID: {result.get('evidence_id')}, S3: {s3_uri}, User: {current_user.user_id}")
         
         return EvidenceResponse(
             evidence_id=result["evidence_id"],
             hash=result["hash"],
             status=result["status"],
-            message="Evidence submitted and verified successfully"
+            message="Evidence submitted to WORM storage and verified successfully"
         )
         
     except HTTPException:
@@ -280,9 +338,6 @@ async def get_evidence_download_url(
         raise HTTPException(status_code=404, detail="Evidence file not found")
     
     try:
-        # Initialize S3 client (assuming AWS credentials are configured)
-        s3_client = boto3.client('s3')
-        
         # Extract bucket and key from file_path
         # Assuming file_path format: "s3://bucket-name/key"
         if evidence.file_path.startswith("s3://"):
@@ -290,18 +345,25 @@ async def get_evidence_download_url(
             bucket_name = path_parts[0]
             key = path_parts[1]
         else:
-            # Fallback: assume it's just the key and use default bucket
-            bucket_name = "firemode-evidence"  # Default bucket name
+            # Fallback: assume it's just the key and use WORM bucket
+            bucket_name = os.getenv('WORM_EVIDENCE_BUCKET', 'firemode-evidence-worm')
             key = evidence.file_path
         
+        # Use WORM uploader for consistent S3 operations
+        worm_uploader = WormStorageUploader(bucket_name=bucket_name)
+        
         # Generate pre-signed URL with 7-day expiry
-        download_url = s3_client.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': bucket_name, 'Key': key},
-            ExpiresIn=7 * 24 * 60 * 60  # 7 days in seconds
+        download_url = worm_uploader.get_presigned_url(
+            s3_key=key,
+            expiration=7 * 24 * 60 * 60  # 7 days in seconds
         )
         
         expires_at = datetime.utcnow() + timedelta(days=7)
+        
+        # Verify object is still immutable (optional check)
+        immutability_check = worm_uploader.verify_immutability(key)
+        if not immutability_check.get('is_immutable', False):
+            logger.warning(f"Evidence {evidence_id} immutability check failed")
         
         logger.info(f"Generated download URL for evidence {evidence_id} for user {current_user.user_id}")
         

@@ -1,0 +1,479 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudWatch monitoring and alerting for WORM storage compliance'
+
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Environment name
+
+  EvidenceBucketName:
+    Type: String
+    Description: Name of the WORM evidence bucket
+    Default: firemode-evidence-worm
+
+  ReportsBucketName:
+    Type: String
+    Description: Name of the WORM reports bucket
+    Default: firemode-reports-worm
+
+  AlertsTopicArn:
+    Type: String
+    Description: SNS topic ARN for alerts
+    Default: ''
+
+  NotificationEmail:
+    Type: String
+    Description: Email address for notifications
+    Default: alerts@firemode.com
+
+Resources:
+  # SNS Topic for WORM Alerts
+  WormAlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'firemode-worm-alerts-${Env}'
+      DisplayName: 'FireMode WORM Storage Alerts'
+      Tags:
+        - Key: Purpose
+          Value: WORM-Monitoring
+        - Key: Environment
+          Value: !Ref Env
+
+  # SNS Subscription
+  WormAlertsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      TopicArn: !Ref WormAlertsTopic
+      Endpoint: !Ref NotificationEmail
+
+  # CloudWatch Log Group for WORM Operations
+  WormOperationsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/firemode/worm-operations-${Env}'
+      RetentionInDays: 90
+      Tags:
+        - Key: Purpose
+          Value: WORM-Monitoring
+        - Key: Environment
+          Value: !Ref Env
+
+  # Custom Metrics Namespace
+  WormMetricsNamespace:
+    Type: AWS::CloudWatch::MetricStream
+    Properties:
+      Name: !Sub 'firemode-worm-metrics-${Env}'
+      FirehoseArn: !GetAtt MetricsFirehose.Arn
+      RoleArn: !GetAtt MetricsStreamRole.Arn
+      OutputFormat: json
+      IncludeFilters:
+        - Namespace: AWS/S3
+          MetricNames:
+            - BucketSizeBytes
+            - NumberOfObjects
+            - AllRequests
+            - GetRequests
+            - PutRequests
+            - DeleteRequests
+            - HeadRequests
+            - PostRequests
+            - SelectRequests
+            - ListRequests
+            - BytesDownloaded
+            - BytesUploaded
+            - 4xxErrors
+            - 5xxErrors
+
+  # Kinesis Data Firehose for Metrics
+  MetricsFirehose:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties:
+      DeliveryStreamName: !Sub 'firemode-worm-metrics-${Env}'
+      DeliveryStreamType: DirectPut
+      ExtendedS3DestinationConfiguration:
+        BucketARN: !Sub 'arn:aws:s3:::${MetricsBucket}'
+        Prefix: 'metrics/'
+        BufferingHints:
+          SizeInMBs: 1
+          IntervalInSeconds: 60
+        CompressionFormat: GZIP
+        RoleARN: !GetAtt FirehoseRole.Arn
+        ProcessingConfiguration:
+          Enabled: true
+          Processors:
+            - Type: Lambda
+              Parameters:
+                - ParameterName: LambdaArn
+                  ParameterValue: !GetAtt MetricsProcessor.Arn
+
+  # S3 Bucket for Metrics Storage
+  MetricsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'firemode-worm-metrics-${Env}'
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldMetrics
+            Status: Enabled
+            ExpirationInDays: 90
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # Lambda for Metrics Processing
+  MetricsProcessor:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'firemode-worm-metrics-processor-${Env}'
+      Runtime: python3.9
+      Handler: index.handler
+      Role: !GetAtt MetricsProcessorRole.Arn
+      Timeout: 60
+      Environment:
+        Variables:
+          LOG_LEVEL: INFO
+      Code:
+        ZipFile: |
+          import json
+          import gzip
+          import base64
+          import boto3
+          
+          def handler(event, context):
+              # Process CloudWatch metrics
+              records = []
+              for record in event['records']:
+                  # Decode and decompress
+                  data = base64.b64decode(record['data'])
+                  decompressed = gzip.decompress(data)
+                  metrics = json.loads(decompressed)
+                  
+                  # Process metrics (add custom logic here)
+                  processed_data = json.dumps(metrics)
+                  
+                  records.append({
+                      'recordId': record['recordId'],
+                      'result': 'Ok',
+                      'data': base64.b64encode(processed_data.encode()).decode()
+                  })
+              
+              return {'records': records}
+
+  # CloudWatch Alarms for WORM Storage
+  EvidenceUploadErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'worm-evidence-upload-errors-${Env}'
+      AlarmDescription: 'Monitor WORM evidence bucket upload errors'
+      MetricName: 5xxErrors
+      Namespace: AWS/S3
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: BucketName
+          Value: !Ref EvidenceBucketName
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WormAlertsTopic
+
+  ReportsUploadErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'worm-reports-upload-errors-${Env}'
+      AlarmDescription: 'Monitor WORM reports bucket upload errors'
+      MetricName: 5xxErrors
+      Namespace: AWS/S3
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: BucketName
+          Value: !Ref ReportsBucketName
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WormAlertsTopic
+
+  EvidenceBucketSizeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'worm-evidence-bucket-size-${Env}'
+      AlarmDescription: 'Monitor WORM evidence bucket size'
+      MetricName: BucketSizeBytes
+      Namespace: AWS/S3
+      Statistic: Average
+      Period: 86400  # Daily
+      EvaluationPeriods: 1
+      Threshold: 1000000000000  # 1TB
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: BucketName
+          Value: !Ref EvidenceBucketName
+        - Name: StorageType
+          Value: StandardStorage
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WormAlertsTopic
+
+  EvidenceObjectCountAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'worm-evidence-object-count-${Env}'
+      AlarmDescription: 'Monitor WORM evidence bucket object count'
+      MetricName: NumberOfObjects
+      Namespace: AWS/S3
+      Statistic: Average
+      Period: 86400  # Daily
+      EvaluationPeriods: 1
+      Threshold: 10000000  # 10M objects
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: BucketName
+          Value: !Ref EvidenceBucketName
+        - Name: StorageType
+          Value: AllStorageTypes
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WormAlertsTopic
+
+  # Custom Alarms for WORM Compliance
+  WormComplianceCheckAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'worm-compliance-check-failures-${Env}'
+      AlarmDescription: 'Monitor WORM compliance check failures'
+      MetricName: ComplianceCheckFailures
+      Namespace: FireMode/WORM
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WormAlertsTopic
+
+  WormRetentionViolationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'worm-retention-violations-${Env}'
+      AlarmDescription: 'Monitor WORM retention policy violations'
+      MetricName: RetentionViolations
+      Namespace: FireMode/WORM
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WormAlertsTopic
+
+  WormMigrationFailuresAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'worm-migration-failures-${Env}'
+      AlarmDescription: 'Monitor WORM migration failures'
+      MetricName: MigrationFailures
+      Namespace: FireMode/WORM
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref WormAlertsTopic
+
+  # CloudWatch Dashboard
+  WormDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub 'FireMode-WORM-${Env}'
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/S3", "BucketSizeBytes", "BucketName", "${EvidenceBucketName}", "StorageType", "StandardStorage" ],
+                  [ ".", "BucketSizeBytes", ".", "${ReportsBucketName}", ".", "StandardStorage" ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "WORM Bucket Storage Usage",
+                "period": 86400,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/S3", "NumberOfObjects", "BucketName", "${EvidenceBucketName}", "StorageType", "AllStorageTypes" ],
+                  [ ".", "NumberOfObjects", ".", "${ReportsBucketName}", ".", "AllStorageTypes" ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "WORM Bucket Object Count",
+                "period": 86400,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 6,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/S3", "5xxErrors", "BucketName", "${EvidenceBucketName}" ],
+                  [ ".", "5xxErrors", ".", "${ReportsBucketName}" ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "WORM Bucket Errors",
+                "period": 300,
+                "stat": "Sum"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 6,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "FireMode/WORM", "ComplianceCheckFailures" ],
+                  [ ".", "RetentionViolations" ],
+                  [ ".", "MigrationFailures" ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "WORM Compliance Metrics",
+                "period": 300,
+                "stat": "Sum"
+              }
+            }
+          ]
+        }
+
+  # IAM Roles
+  MetricsStreamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'firemode-worm-metrics-stream-role-${Env}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudwatch.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: MetricsStreamPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - firehose:PutRecord
+                  - firehose:PutRecordBatch
+                Resource: !GetAtt MetricsFirehose.Arn
+
+  FirehoseRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'firemode-worm-firehose-role-${Env}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: FirehosePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:AbortMultipartUpload
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:ListBucketMultipartUploads
+                  - s3:PutObject
+                Resource:
+                  - !GetAtt MetricsBucket.Arn
+                  - !Sub '${MetricsBucket}/*'
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt MetricsProcessor.Arn
+
+  MetricsProcessorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'firemode-worm-metrics-processor-role-${Env}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+Outputs:
+  AlertsTopicArn:
+    Description: 'SNS topic ARN for WORM alerts'
+    Value: !Ref WormAlertsTopic
+    Export:
+      Name: !Sub '${AWS::StackName}-AlertsTopic'
+
+  DashboardUrl:
+    Description: 'CloudWatch Dashboard URL'
+    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${WormDashboard}'
+    Export:
+      Name: !Sub '${AWS::StackName}-DashboardUrl'
+
+  LogGroupName:
+    Description: 'CloudWatch Log Group for WORM operations'
+    Value: !Ref WormOperationsLogGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-LogGroup'
+
+  MetricsBucketName:
+    Description: 'S3 bucket for metrics storage'
+    Value: !Ref MetricsBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-MetricsBucket'

@@ -1,0 +1,291 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'WORM-enabled S3 buckets with Object Lock for AS 1851-2012 compliance'
+
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Environment name
+
+  RetentionYears:
+    Type: Number
+    Default: 7
+    MinValue: 1
+    MaxValue: 10
+    Description: Object retention period in years
+
+  BackupRegion:
+    Type: String
+    Default: us-west-2
+    Description: Cross-region backup region
+
+Resources:
+  # WORM-enabled Evidence Bucket
+  EvidenceWormBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'firemode-evidence-worm-${Env}'
+      ObjectLockEnabled: true
+      ObjectLockConfiguration:
+        ObjectLockEnabled: Enabled
+        Rule:
+          DefaultRetention:
+            Mode: COMPLIANCE
+            Years: !Ref RetentionYears
+      VersioningConfiguration:
+        Status: Enabled
+      ReplicationConfiguration:
+        Role: !GetAtt ReplicationRole.Arn
+        Rules:
+          - Id: ReplicateToBackup
+            Status: Enabled
+            Prefix: ''
+            Destination:
+              Bucket: !GetAtt BackupBucket.Arn
+              ReplicationTime:
+                Status: Enabled
+                Time:
+                  Minutes: 15
+              StorageClass: STANDARD_IA
+      LifecycleConfiguration:
+        Rules:
+          - Id: TransitionToGlacier
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 90
+                StorageClass: GLACIER
+              - TransitionInDays: 365
+                StorageClass: DEEP_ARCHIVE
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      NotificationConfiguration:
+        CloudWatchConfigurations:
+          - Event: s3:ObjectCreated:*
+            CloudWatchConfiguration:
+              LogGroupName: !Ref EvidenceLogGroup
+      Tags:
+        - Key: Purpose
+          Value: WORM-Evidence-Storage
+        - Key: Compliance
+          Value: AS1851-2012
+        - Key: Retention
+          Value: !Sub '${RetentionYears}-Years'
+        - Key: Environment
+          Value: !Ref Env
+
+  # WORM-enabled Reports Bucket
+  ReportsWormBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'firemode-reports-worm-${Env}'
+      ObjectLockEnabled: true
+      ObjectLockConfiguration:
+        ObjectLockEnabled: Enabled
+        Rule:
+          DefaultRetention:
+            Mode: COMPLIANCE
+            Years: !Ref RetentionYears
+      VersioningConfiguration:
+        Status: Enabled
+      ReplicationConfiguration:
+        Role: !GetAtt ReplicationRole.Arn
+        Rules:
+          - Id: ReplicateToBackup
+            Status: Enabled
+            Prefix: ''
+            Destination:
+              Bucket: !GetAtt BackupBucket.Arn
+              ReplicationTime:
+                Status: Enabled
+                Time:
+                  Minutes: 15
+              StorageClass: STANDARD_IA
+      LifecycleConfiguration:
+        Rules:
+          - Id: TransitionToGlacier
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 90
+                StorageClass: GLACIER
+              - TransitionInDays: 365
+                StorageClass: DEEP_ARCHIVE
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      NotificationConfiguration:
+        CloudWatchConfigurations:
+          - Event: s3:ObjectCreated:*
+            CloudWatchConfiguration:
+              LogGroupName: !Ref ReportsLogGroup
+      Tags:
+        - Key: Purpose
+          Value: WORM-Reports-Storage
+        - Key: Compliance
+          Value: AS1851-2012
+        - Key: Retention
+          Value: !Sub '${RetentionYears}-Years'
+        - Key: Environment
+          Value: !Ref Env
+
+  # Cross-region Backup Bucket
+  BackupBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'firemode-backup-${Env}-${BackupRegion}'
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Purpose
+          Value: Cross-Region-Backup
+        - Key: Environment
+          Value: !Ref Env
+
+  # IAM Role for Replication
+  ReplicationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'firemode-replication-role-${Env}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: s3.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ReplicationPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObjectVersion
+                  - s3:GetObjectVersionAcl
+                Resource: !Sub '${EvidenceWormBucket}/*'
+              - Effect: Allow
+                Action:
+                  - s3:ReplicateObject
+                  - s3:ReplicateDelete
+                Resource: !Sub '${BackupBucket}/*'
+              - Effect: Allow
+                Action:
+                  - s3:GetObjectVersion
+                  - s3:GetObjectVersionAcl
+                Resource: !Sub '${ReportsWormBucket}/*'
+
+  # CloudWatch Log Groups
+  EvidenceLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/s3/firemode-evidence-worm-${Env}'
+      RetentionInDays: 90
+
+  ReportsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/s3/firemode-reports-worm-${Env}'
+      RetentionInDays: 90
+
+  # CloudWatch Alarms
+  EvidenceUploadAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'worm-evidence-upload-errors-${Env}'
+      AlarmDescription: 'Monitor WORM evidence bucket upload errors'
+      MetricName: UploadErrors
+      Namespace: AWS/S3
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: BucketName
+          Value: !Ref EvidenceWormBucket
+      TreatMissingData: notBreaching
+
+  ReportsUploadAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'worm-reports-upload-errors-${Env}'
+      AlarmDescription: 'Monitor WORM reports bucket upload errors'
+      MetricName: UploadErrors
+      Namespace: AWS/S3
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: BucketName
+          Value: !Ref ReportsWormBucket
+      TreatMissingData: notBreaching
+
+  # SNS Topic for Alerts
+  WormAlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'firemode-worm-alerts-${Env}'
+      DisplayName: 'FireMode WORM Storage Alerts'
+
+  # SNS Subscription (placeholder - requires email confirmation)
+  WormAlertsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      TopicArn: !Ref WormAlertsTopic
+      Endpoint: !Sub 'alerts+worm-${Env}@firemode.com'
+
+Outputs:
+  EvidenceBucketName:
+    Description: 'WORM-enabled evidence bucket name'
+    Value: !Ref EvidenceWormBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-EvidenceBucket'
+
+  ReportsBucketName:
+    Description: 'WORM-enabled reports bucket name'
+    Value: !Ref ReportsWormBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-ReportsBucket'
+
+  BackupBucketName:
+    Description: 'Cross-region backup bucket name'
+    Value: !Ref BackupBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-BackupBucket'
+
+  ReplicationRoleArn:
+    Description: 'IAM role ARN for S3 replication'
+    Value: !GetAtt ReplicationRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ReplicationRole'
+
+  AlertsTopicArn:
+    Description: 'SNS topic ARN for WORM alerts'
+    Value: !Ref WormAlertsTopic
+    Export:
+      Name: !Sub '${AWS::StackName}-AlertsTopic'
