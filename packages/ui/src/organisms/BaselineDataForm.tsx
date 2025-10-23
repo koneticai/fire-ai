@@ -226,9 +226,9 @@ export function BaselineDataForm({
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => {
+      complete: (results: any) => {
         if (results.errors.length > 0) {
-          setCsvError(`CSV parsing errors: ${results.errors.map(e => e.message).join(', ')}`);
+          setCsvError(`CSV parsing errors: ${results.errors.map((e: any) => e.message).join(', ')}`);
           return;
         }
 
@@ -264,7 +264,7 @@ export function BaselineDataForm({
           })));
         }
       },
-      error: (error) => {
+      error: (error: any) => {
         setCsvError(`CSV parsing failed: ${error.message}`);
       },
     });
@@ -301,8 +301,7 @@ export function BaselineDataForm({
       <h3 className="text-lg font-semibold">Design Criteria</h3>
       
       {/* Floor Pressure Setpoints */}
-      <Card>
-        <h4 className="font-medium mb-4">Floor Pressure Setpoints</h4>
+      <Card title="Floor Pressure Setpoints">
         {floorFields.map((field, index) => (
           <div key={field.id} className="grid grid-cols-3 gap-4 mb-4">
             <Input
@@ -319,8 +318,7 @@ export function BaselineDataForm({
             <Button
               type="button"
               onClick={() => removeFloor(index)}
-              variant="outline"
-              size="sm"
+              variant="secondary"
             >
               Remove
             </Button>
@@ -335,7 +333,7 @@ export function BaselineDataForm({
         <Button
           type="button"
           onClick={() => appendFloor({ floor_id: '', pressure_pa: 0 })}
-          variant="outline"
+          variant="secondary"
         >
           Add Floor
         </Button>
@@ -343,8 +341,7 @@ export function BaselineDataForm({
 
       {/* Equipment Specifications */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <h4 className="font-medium mb-4">Fan Specifications</h4>
+        <Card title="Fan Specifications">
           {fanFields.map((field, index) => (
             <div key={field.id} className="space-y-2 mb-4">
               <Input
@@ -360,8 +357,7 @@ export function BaselineDataForm({
               <Button
                 type="button"
                 onClick={() => removeFan(index)}
-                variant="outline"
-                size="sm"
+                variant="secondary"
               >
                 Remove Fan
               </Button>
@@ -370,14 +366,13 @@ export function BaselineDataForm({
           <Button
             type="button"
             onClick={() => appendFan({ fan_id: '', model: '' })}
-            variant="outline"
+            variant="secondary"
           >
             Add Fan
           </Button>
         </Card>
 
-        <Card>
-          <h4 className="font-medium mb-4">Damper Specifications</h4>
+        <Card title="Damper Specifications">
           {damperFields.map((field, index) => (
             <div key={field.id} className="space-y-2 mb-4">
               <Input
@@ -393,8 +388,7 @@ export function BaselineDataForm({
               <Button
                 type="button"
                 onClick={() => removeDamper(index)}
-                variant="outline"
-                size="sm"
+                variant="secondary"
               >
                 Remove Damper
               </Button>
@@ -403,7 +397,7 @@ export function BaselineDataForm({
           <Button
             type="button"
             onClick={() => appendDamper({ damper_id: '', type: '' })}
-            variant="outline"
+            variant="secondary"
           >
             Add Damper
           </Button>
@@ -411,8 +405,7 @@ export function BaselineDataForm({
       </div>
 
       {/* Additional Configuration */}
-      <Card>
-        <h4 className="font-medium mb-4">Additional Configuration</h4>
+      <Card title="Additional Configuration">
         <div className="space-y-4">
           <Input
             {...register('door_force_limit_newtons', { valueAsNumber: true })}
@@ -447,8 +440,7 @@ export function BaselineDataForm({
       <h3 className="text-lg font-semibold">Commissioning Baselines</h3>
       
       {/* CSV Upload */}
-      <Card>
-        <h4 className="font-medium mb-4">Bulk Upload (CSV)</h4>
+      <Card title="Bulk Upload (CSV)">
         <div className="space-y-4">
           <input
             type="file"
@@ -473,8 +465,7 @@ export function BaselineDataForm({
       {/* Manual Entry Tables */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Pressure Measurements */}
-        <Card>
-          <h4 className="font-medium mb-4">Pressure Measurements</h4>
+        <Card title="Pressure Measurements">
           {pressureFields.map((field, index) => (
             <div key={field.id} className="space-y-2 mb-4">
               <Input
@@ -501,8 +492,7 @@ export function BaselineDataForm({
               <Button
                 type="button"
                 onClick={() => removePressure(index)}
-                variant="outline"
-                size="sm"
+                variant="secondary"
               >
                 Remove
               </Button>
@@ -516,15 +506,14 @@ export function BaselineDataForm({
               pressure_pa: 0, 
               measured_date: new Date().toISOString().split('T')[0] 
             })}
-            variant="outline"
+            variant="secondary"
           >
             Add Pressure
           </Button>
         </Card>
 
         {/* Velocity Measurements */}
-        <Card>
-          <h4 className="font-medium mb-4">Velocity Measurements</h4>
+        <Card title="Velocity Measurements">
           {velocityFields.map((field, index) => (
             <div key={field.id} className="space-y-2 mb-4">
               <Input
@@ -547,8 +536,7 @@ export function BaselineDataForm({
               <Button
                 type="button"
                 onClick={() => removeVelocity(index)}
-                variant="outline"
-                size="sm"
+                variant="secondary"
               >
                 Remove
               </Button>
@@ -561,15 +549,14 @@ export function BaselineDataForm({
               velocity_ms: 0, 
               measured_date: new Date().toISOString().split('T')[0] 
             })}
-            variant="outline"
+            variant="secondary"
           >
             Add Velocity
           </Button>
         </Card>
 
         {/* Door Force Measurements */}
-        <Card>
-          <h4 className="font-medium mb-4">Door Force Measurements</h4>
+        <Card title="Door Force Measurements">
           {forceFields.map((field, index) => (
             <div key={field.id} className="space-y-2 mb-4">
               <Input
@@ -591,8 +578,7 @@ export function BaselineDataForm({
               <Button
                 type="button"
                 onClick={() => removeForce(index)}
-                variant="outline"
-                size="sm"
+                variant="secondary"
               >
                 Remove
               </Button>
@@ -605,7 +591,7 @@ export function BaselineDataForm({
               force_newtons: 0, 
               measured_date: new Date().toISOString().split('T')[0] 
             })}
-            variant="outline"
+            variant="secondary"
           >
             Add Force
           </Button>
@@ -619,8 +605,7 @@ export function BaselineDataForm({
       <h3 className="text-lg font-semibold">Review & Submit</h3>
       
       {/* Completeness Indicator */}
-      <Card>
-        <h4 className="font-medium mb-4">Baseline Completeness</h4>
+      <Card title="Baseline Completeness">
         <div className="space-y-4">
           <div className="flex items-center space-x-4">
             <div className="flex-1 bg-gray-200 rounded-full h-4">
@@ -647,20 +632,18 @@ export function BaselineDataForm({
 
       {/* Error Display */}
       {error && (
-        <Card className="border-red-200 bg-red-50">
+        <Card title="Submission Error">
           <div className="text-red-800" role="alert">
-            <h4 className="font-medium">Submission Error</h4>
-            <p className="text-sm mt-1">{error.message}</p>
+            <p className="text-sm">{error.message}</p>
           </div>
         </Card>
       )}
 
       {/* Success Display */}
       {lastResponse?.success && (
-        <Card className="border-green-200 bg-green-50">
+        <Card title="Submission Successful">
           <div className="text-green-800">
-            <h4 className="font-medium">Submission Successful</h4>
-            <p className="text-sm mt-1">{lastResponse.message}</p>
+            <p className="text-sm">{lastResponse.message}</p>
             <p className="text-sm mt-1">
               Created {lastResponse.items_created} items, updated {lastResponse.items_updated} items
             </p>
@@ -673,7 +656,7 @@ export function BaselineDataForm({
         <Button
           type="button"
           onClick={() => setActiveTab('baselines')}
-          variant="outline"
+          variant="secondary"
         >
           Back to Baselines
         </Button>
@@ -735,7 +718,7 @@ export function BaselineDataForm({
             if (activeTab === 'baselines') setActiveTab('design');
             else if (activeTab === 'review') setActiveTab('baselines');
           }}
-          variant="outline"
+          variant="secondary"
           disabled={activeTab === 'design'}
         >
           Previous

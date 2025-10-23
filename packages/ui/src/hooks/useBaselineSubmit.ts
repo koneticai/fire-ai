@@ -207,11 +207,11 @@ export function useBaselineSubmit({
     try {
       buildingBaselineSubmitSchema.parse(data);
       return { isValid: true, errors: [] };
-    } catch (err) {
+    } catch (err: unknown) {
       if (err instanceof z.ZodError) {
         return {
           isValid: false,
-          errors: err.errors.map(e => `${e.path.join('.')}: ${e.message}`),
+          errors: err.errors.map((e: any) => `${e.path.join('.')}: ${e.message}`),
         };
       }
       return {
@@ -296,7 +296,7 @@ export function useBaselineSubmit({
       onSuccess?.(result);
       return result;
 
-    } catch (err) {
+    } catch (err: unknown) {
       const error = err instanceof Error ? err : new Error('Unknown error occurred');
       setError(error);
       onError?.(error);
