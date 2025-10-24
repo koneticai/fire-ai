@@ -6,3 +6,5 @@ export * from './organisms/CostOverview';
 export * from './organisms/HealthDashboard';
 export * from './organisms/SchemaRegistry';
 export * from './organisms/DRStatus';
+export * from './organisms/ComplianceDesigner';
+export * from './hooks/useComplianceWorkflow';
