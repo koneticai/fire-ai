@@ -215,7 +215,20 @@ async def go_service_health():
 # REMOVED: Duplicate app-level route - handled by test_sessions router
 
 # Import and include routers
-from .routers import rules, auth, rules_versioned, classify, users, evidence, test_results, rtl, buildings, test_sessions, defects
+from .routers import (
+    rules,
+    auth,
+    rules_versioned,
+    classify,
+    users,
+    evidence,
+    test_results,
+    rtl,
+    buildings,
+    test_sessions,
+    defects,
+    compliance_workflows,
+)
 
 # Add standardized error handling
 from fastapi import Request
@@ -252,6 +265,7 @@ app.include_router(rules.router, prefix="/v1/rules")
 app.include_router(rules_versioned.router, prefix="/v2/rules")
 app.include_router(classify.router, prefix="/v1/classify")
 app.include_router(users.router, prefix="/v1/users")
+app.include_router(compliance_workflows.router)
 
 # Add health endpoints
 from .health import readiness
