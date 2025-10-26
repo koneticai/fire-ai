@@ -220,6 +220,7 @@ from .routers import (
     auth,
     rules_versioned,
     classify,
+    interface_tests,
     users,
     evidence,
     test_results,
@@ -228,6 +229,8 @@ from .routers import (
     test_sessions,
     defects,
     compliance_workflows,
+    ce_tests,
+    reports,
 )
 
 # Add standardized error handling
@@ -264,8 +267,11 @@ app.include_router(evidence.router)  # Evidence router has its own prefix
 app.include_router(rules.router, prefix="/v1/rules")
 app.include_router(rules_versioned.router, prefix="/v2/rules")
 app.include_router(classify.router, prefix="/v1/classify")
+app.include_router(interface_tests.router)
 app.include_router(users.router, prefix="/v1/users")
 app.include_router(compliance_workflows.router)
+app.include_router(ce_tests.router)
+app.include_router(reports.router)
 
 # Add health endpoints
 from .health import readiness

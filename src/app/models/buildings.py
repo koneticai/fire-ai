@@ -93,6 +93,22 @@ class Building(Base):
         back_populates="building",
         cascade="all, delete-orphan"
     )
+    interface_test_definitions = relationship(
+        "InterfaceTestDefinition",
+        back_populates="building",
+        cascade="all, delete-orphan"
+    )
+    interface_test_sessions = relationship(
+        "InterfaceTestSession",
+        back_populates="building",
+        cascade="all, delete-orphan"
+    )
+    ce_test_sessions = relationship(
+        "CETestSession", 
+        back_populates="building",
+        cascade="all, delete-orphan",
+        lazy='select'
+    )
     
     def __repr__(self):
         return f"<Building(id={self.id}, name='{self.name}', type='{self.building_type}')>"
