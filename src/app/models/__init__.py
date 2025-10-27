@@ -18,6 +18,7 @@ from .interface_test import (
     InterfaceTestSession,
     InterfaceTestEvent,
 )
+from .audit_log import AuditLog
 
 __all__ = [
     "User",
@@ -42,4 +43,5 @@ __all__ = [
     "InterfaceTestDefinition",
     "InterfaceTestSession",
     "InterfaceTestEvent",
+    "AuditLog",
 ]
