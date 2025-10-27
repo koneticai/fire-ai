@@ -166,6 +166,10 @@ from slowapi.errors import RateLimitExceeded
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 
+# Add security headers middleware (FIRST - applies to all responses)
+from .middleware.security_headers import SecurityHeadersMiddleware
+app.add_middleware(SecurityHeadersMiddleware)
+
 # Add concurrency middleware for vector clock detection
 from .middleware.concurrency import detect_concurrent_writes
 app.middleware("http")(detect_concurrent_writes)
