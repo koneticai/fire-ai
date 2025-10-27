@@ -1,39 +1,71 @@
-# .cursor/rules/high-impact.mdc
----
-name: "High-Impact Workflow Rules"
-description: "The 20% of rules that deliver ~80% of the benefit."
+# high-impact.mdc — Cursor rules (merged: existing + SoT/AGENTS alignment)
+
+meta:
+  id: high-impact
+  description: High-Impact Workflow Rules + Single Source of Truth alignment
+  alwaysApply: false
+
 globs:
   - "**/*"
----
 
-## Workflow
-- Open a fresh chat for each task; reset when context drifts.
-- Require a **Plan → Implement → Test** loop for every change.
-- Use the Master Structured change template; return only patched hunks.
+# ——— Core Workflow & Size ———
+prompts:
+  - id: workflow-plan-implement-test
+    when: "command:ask"
+    instruction: |
+      Follow the repo's high-impact workflow:
+      - Plan → Implement → Test (loop for every change).
+      - Limit tasks to ~30–75 LOC of change.
+      - If a file exceeds ~500 LOC, propose extraction/splitting.
+      - Return only the minimal patched hunks needed.
 
-## Scope & Size
-- Limit tasks to **30–75 LOC** of change.
-- Keep files ≤ **500 LOC**; split or extract when larger.
+  - id: file-targeting-and-tests
+    when: "command:ask"
+    instruction: |
+      Target only the specific files required (e.g., @src/Feature.tsx) and co-tag the matching test file
+      (e.g., @tests/Feature.test.ts). Propose or update tests for any behavior change.
 
-## Targeting
-- Tag only the specific files needed (e.g., `@src/Feature.tsx`).
-- Co-tag the matching test file (e.g., `@tests/Feature.test.ts`).
+# ——— Single Source of Truth & Agent Playbook ———
+  - id: single-source-of-truth
+    when: "command:ask"
+    instruction: |
+      The Single Source of Truth is ./data_model.md (root). For any change that touches data, schemas,
+      services, or UI contracts, reference ./data_model.md. Prefer additive migrations and avoid
+      destructive changes unless a backup/rollback plan is included.
 
-## Version Control
-- Commit after every stable change.
-- Review diffs before applying or merging.
+  - id: agent-playbook
+    when: "command:ask"
+    instruction: |
+      Defer to AGENTS.md (repo root) for project-wide rules: small diffs, Security Gate, PR checklist,
+      and CI expectations. If guidance elsewhere conflicts, AGENTS.md wins.
 
-## CI Gates
-- Run CI stages in order: **Install → Lint → Typecheck → Unit → Integration → Security → Build → Preview Deploy**.
-- Block merges on failing tests, **high/critical** vulnerabilities, or budget breaches (e.g., bundle size).
+# ——— Security Gate ———
+  - id: security-gate
+    when: "command:fix"
+    instruction: |
+      Verify the Security Gate before finalizing:
+      - Input validation (FastAPI/Pydantic or relevant framework).
+      - Parameterized queries (no string-built SQL).
+      - AuthZ checks on protected paths.
+      - Web security: headers/CSP, strict CORS, CSRF as applicable.
+      - Secrets only in env/secret manager; never hardcode.
+      - Crypto: short-lived JWT + revocation, Fernet for sensitive at rest, Argon2 for passwords.
+      - DB: JSONB + GIN where applicable; FK/unique/temporal indexes per ./data_model.md.
+      - Errors: structured; no secret/stack leakage.
 
-## Security
-- Never hardcode secrets; use environment + secret manager.
-- Validate inputs and parameterize all queries.
+# ——— CI & Documentation ———
+  - id: ci-gates
+    when: "command:ask"
+    instruction: |
+      Respect CI order: Install → Lint → Typecheck → Unit → Integration → Security → Build → Preview Deploy.
+      Block merges on failing tests, high/critical vulns, or budget breaches (e.g., bundle size).
 
-## i18n & a11y
-- Externalize all user-visible strings (no inline literals).
-- Meet **WCAG 2.2 AA** baseline.
+  - id: documentation-handoff
+    when: "command:ask"
+    instruction: |
+      Keep ADRs concise. For agent rules, maintain AGENTS.md (canonical). If a cursor_rules.md exists, ensure
+      it links to AGENTS.md to avoid divergence.
 
-## Documentation
-- Maintain `cursor_rules.md` and ADRs; reference them in prompts and PRs.
+links:
+  - "AGENTS.md"
+  - "data_model.md"

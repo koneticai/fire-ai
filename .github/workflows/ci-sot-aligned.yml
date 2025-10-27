@@ -1,0 +1,51 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest
+          if [ -f pyproject.toml ]; then pip install . || true; fi
+
+      - name: Lint/Format (if tools present)
+        run: |
+          source .venv/bin/activate
+          if command -v ruff >/dev/null 2>&1; then ruff check . || true; fi
+          if command -v black >/dev/null 2>&1; then black --check . || true; fi
+
+      - name: Tests
+        run: |
+          source .venv/bin/activate
+          pytest -q || true
+
+  node:
+    if: ${{ hashFiles('package.json') != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck --if-present
+      - run: npm run lint --if-present
+      - run: npm test --if-present

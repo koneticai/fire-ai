@@ -1,0 +1,57 @@
+# .droid.yaml — Droid behavior aligned to ./data_model.md
+
+version: 1
+
+project:
+  name: firemode-compliance
+  language: python
+  packageManager: pip
+
+workflows:
+  review:
+    planPrompt: |
+      Produce a concise plan (files, tests, risks). Do NOT make code changes yet.
+      Confirm any data-touching change is aligned with ./data_model.md (Single Source of Truth).
+    reviewPrompt: |
+      Review the diff for correctness, tests, and Security Gate (see AGENTS.md): validation, authZ,
+      JWT/Fernet/Argon2, and DB indexes per ./data_model.md. Propose small incremental improvements.
+    autoRun: low
+
+  implement_small_diff:
+    planPrompt: |
+      Plan a change limited to 30–75 LOC with tests. Reference ./data_model.md for schema/services/UI impacts.
+      Prefer additive migrations; avoid destructive changes.
+    changePrompt: |
+      Apply minimal changes with inline comments and tests. If migrations are needed, add Alembic scripts.
+    autoRun: low
+
+limits:
+  maxFilesTouched: 6
+  maxTokensPlan: 4000
+  maxTokensImplement: 6000
+
+paths:
+  include:
+    - "app/**"
+    - "alembic/**"
+    - "src/**"
+    - "tests/**"
+    - "migrations/**"
+  exclude:
+    - "node_modules/**"
+    - "dist/**"
+    - ".git/**"
+
+tools:
+  runCommands:
+    - "pytest -q"
+    - "alembic upgrade head"
+    - "ruff check . || true"
+  forbidden:
+    - "git push"
+    - "sudo"
+    - "rm -rf /"
+
+notes:
+  - "Project rules live in AGENTS.md"
+  - "Single Source of Truth is ./data_model.md"
