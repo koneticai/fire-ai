@@ -19,6 +19,7 @@ from .interface_test import (
     InterfaceTestEvent,
 )
 from .audit_log import AuditLog
+from .calibration import CalibrationCertificate
 
 __all__ = [
     "User",
@@ -44,4 +45,5 @@ __all__ = [
     "InterfaceTestSession",
     "InterfaceTestEvent",
     "AuditLog",
+    "CalibrationCertificate",
 ]
