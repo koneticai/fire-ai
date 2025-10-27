@@ -32,6 +32,8 @@ jobs:
           if command -v black >/dev/null 2>&1; then black --check .; fi
 
       - name: Tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}/services/api/src:${{ github.workspace }}/services/api
         run: |
           source .venv/bin/activate
           pytest -q --ignore=services/api/tests/performance
