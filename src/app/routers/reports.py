@@ -8,13 +8,14 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 
 from ..database.core import get_db
 from ..dependencies import get_current_active_user
+from ..middleware.rate_limiter import limiter
 from ..schemas.auth import TokenPayload
 from ..services.report_generator_v2 import ReportGeneratorV2
 from ..services.trend_analyzer import TrendAnalyzer
@@ -66,7 +67,9 @@ class TrendAnalysisResponse(BaseModel):
 
 
 @router.post("/generate", response_model=ReportGenerationResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/hour")
 async def generate_report(
+    http_request: Request,
     request: ReportGenerationRequest,
     db: AsyncSession = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_active_user)

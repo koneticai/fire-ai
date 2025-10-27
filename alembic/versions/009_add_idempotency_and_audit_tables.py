@@ -20,10 +20,13 @@ depends_on = None
 def upgrade():
     """Add idempotency_keys and audit_log tables per data_model.md specification"""
     
+    # Enable pgcrypto extension for gen_random_uuid()
+    op.execute('CREATE EXTENSION IF NOT EXISTS "pgcrypto";')
+    
     # Create idempotency_keys table
     op.create_table('idempotency_keys',
-        sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('uuid_generate_v4()')),
-        sa.Column('key_hash', sa.String(64), nullable=False, unique=True, 
+        sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
+        sa.Column('key_hash', sa.String(64), nullable=False, 
                  comment='SHA-256 hash of the idempotency key'),
         sa.Column('user_id', UUID(as_uuid=True), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
         sa.Column('endpoint', sa.String(255), nullable=False, 
@@ -42,7 +45,7 @@ def upgrade():
     
     # Create audit_log table
     op.create_table('audit_log',
-        sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('uuid_generate_v4()')),
+        sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
         sa.Column('user_id', UUID(as_uuid=True), sa.ForeignKey('users.id', ondelete='SET NULL'), nullable=True,
                  comment='User who performed the action'),
         sa.Column('action', sa.String(100), nullable=False, 

@@ -30,6 +30,7 @@ prophet = "^1.1.0"
 reportlab = "^4.0.0"
 scipy = "^1.11.0"
 numpy = "^1.24.0"
+slowapi = "^0.1.9"
 
 [tool.poetry.group.dev.dependencies]
 pact-python = "^2.1.0"
