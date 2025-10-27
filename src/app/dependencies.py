@@ -56,7 +56,18 @@ async def get_current_active_user(
         )
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Create JWT access token with jti for revocation tracking"""
+    """Create JWT access token with jti for revocation tracking
+    
+    Args:
+        data: Dictionary containing token claims. Should include:
+            - sub: username
+            - user_id: user UUID
+            - roles: list of role strings (e.g., ["engineer", "admin"])
+        expires_delta: Optional custom expiration time
+    
+    Returns:
+        Encoded JWT token string
+    """
     import uuid
     
     to_encode = data.copy()
@@ -73,6 +84,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         "iat": datetime.utcnow()
     })
     
+    # Ensure roles is included (defaults to empty list if not provided)
+    if "roles" not in to_encode:
+        to_encode["roles"] = []
+    
     encoded_jwt = jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.algorithm)
     return encoded_jwt
 
@@ -84,6 +99,7 @@ def verify_token(token: str) -> TokenPayload:
         user_id = payload.get("user_id")
         jti = payload.get("jti")
         exp = payload.get("exp")
+        roles = payload.get("roles", [])
         
         # Require all critical claims to be present and non-empty
         if not username or not user_id or not jti or not exp:
@@ -108,7 +124,8 @@ def verify_token(token: str) -> TokenPayload:
             username=username,
             user_id=user_uuid,
             jti=jti,
-            exp=exp
+            exp=exp,
+            roles=roles
         )
         return token_data
     
