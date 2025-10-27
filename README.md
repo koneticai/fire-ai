@@ -151,7 +151,8 @@ Project truth lives in **`./data_model.md`** (root).
 - **Single Source of Truth (SoT):** `./data_model.md` — reference it for any schema/service/UI change.  
 - **Agent playbook:** `AGENTS.md` — tool-agnostic rules (small diffs, security gate, PR checklist).  
 - **Droid config:** `.droid.yaml` — behavior for Factory Droid.  
-- **Cursor rules:** `.cursor/rules/high-impact.mdc` — thin and defers to `AGENTS.md` + SoT.
+- **Cursor rules:** `.cursor/rules/high-impact.mdc` — thin and defers to `AGENTS.md` + SoT.  
+- **Vendor companion:** [/docs/agents/droid-best-practice.md](/docs/agents/droid-best-practice.md) — Droid workflows and troubleshooting.
 
 ### Mandatory workflow
 1) Plan small changes (30–75 LOC) **referencing `./data_model.md`**.  

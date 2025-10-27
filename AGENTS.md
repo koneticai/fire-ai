@@ -54,3 +54,6 @@ Reference the file data_model.md. Analyze the existing codebase for duplications
 - [ ] Security Gate passed (validation, authZ, JWT/Fernet/Argon2, CSP/CORS/CSRF, secrets)  
 - [ ] DB indexes/constraints align with SoT (JSONB/GIN/FK/unique/temporal)  
 - [ ] Rollback plan considered (if needed)
+
+## 7) Vendor Guides
+- **Droid companion guide:** [/docs/agents/droid-best-practice.md](/docs/agents/droid-best-practice.md) — Factory Droid workflows, tips, and troubleshooting
