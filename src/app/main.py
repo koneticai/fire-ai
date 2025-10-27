@@ -159,6 +159,13 @@ if TELEMETRY_AVAILABLE:
     except:
         pass  # Continue without telemetry
 
+# Configure rate limiter
+from .middleware.rate_limiter import limiter, rate_limit_handler
+from slowapi.errors import RateLimitExceeded
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+
 # Add concurrency middleware for vector clock detection
 from .middleware.concurrency import detect_concurrent_writes
 app.middleware("http")(detect_concurrent_writes)
