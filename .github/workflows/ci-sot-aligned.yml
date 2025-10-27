@@ -24,7 +24,7 @@ jobs:
           pip install pytest pytest-cov
           # Install from services/api if it exists (newer structure)
           if [ -f services/api/pyproject.toml ]; then 
-            pip install jsonschema fastapi pydantic sqlalchemy httpx python-jose cryptography
+            pip install jsonschema fastapi pydantic sqlalchemy httpx python-jose cryptography boto3 email-validator structlog uvicorn
           elif [ -f pyproject.toml ]; then 
             pip install -e . || echo "Warning: Could not install project dependencies"
           fi
