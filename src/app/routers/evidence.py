@@ -187,30 +187,36 @@ async def submit_evidence(
         logger.info(f"Evidence submitted to WORM storage successfully - ID: {result.get('evidence_id')}, S3: {s3_uri}, User: {current_user.user_id}")
         
         # Create audit log entry per data_model.md
-        retention_date = datetime.utcnow() + timedelta(days=365 * 7)
-        audit_entry = AuditLog(
-            user_id=current_user.user_id,
-            action="UPLOAD_EVIDENCE_WORM",
-            resource_type="evidence",
-            resource_id=result["evidence_id"],
-            new_values={
-                "s3_uri": s3_uri,
-                "s3_key": s3_key,
-                "bucket": worm_bucket,
-                "checksum": file_hash,
-                "worm_protected": True,
-                "retention_until": retention_date.isoformat(),
-                "immutability_verified": immutability_check.get('is_immutable', False),
-                "evidence_type": evidence_type,
-                "session_id": session_id,
-                "filename": file.filename
-            },
-            ip_address=request.client.host if request and hasattr(request, 'client') else None,
-            user_agent=request.headers.get('user-agent') if request else None
-        )
-        db.add(audit_entry)
-        await db.commit()
+        try:
+            retention_date = datetime.utcnow() + timedelta(days=365 * 7)
+            audit_entry = AuditLog(
+                user_id=current_user.user_id,
+                action="UPLOAD_EVIDENCE_WORM",
+                resource_type="evidence",
+                resource_id=result["evidence_id"],
+                new_values={
+                    "s3_uri": s3_uri,
+                    "s3_key": s3_key,
+                    "bucket": worm_bucket,
+                    "checksum": file_hash,
+                    "worm_protected": True,
+                    "retention_until": retention_date.isoformat(),
+                    "immutability_verified": immutability_check.get('is_immutable', False),
+                    "evidence_type": evidence_type,
+                    "session_id": session_id,
+                    "filename": file.filename
+                },
+                ip_address=request.client.host if request and hasattr(request, 'client') else None,
+                user_agent=request.headers.get('user-agent') if request else None
+            )
+            db.add(audit_entry)
+            await db.commit()
+        except Exception as audit_error:
+            logger.error(f"Audit log creation failed for evidence {result['evidence_id']}: {audit_error}")
+            # Evidence is already in WORM storage; audit failure should not block user
+            # Consider implementing async retry queue for audit logs
         
+        return EvidenceResponse(
         return EvidenceResponse(
             evidence_id=result["evidence_id"],
             hash=result["hash"],
