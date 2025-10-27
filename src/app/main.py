@@ -162,9 +162,11 @@ if TELEMETRY_AVAILABLE:
 # Configure rate limiter
 from .middleware.rate_limiter import limiter, rate_limit_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # Add security headers middleware (FIRST - applies to all responses)
 from .middleware.security_headers import SecurityHeadersMiddleware

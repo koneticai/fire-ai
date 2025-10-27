@@ -115,3 +115,60 @@ def test_limiter_callable():
     # Verify limiter exists and is callable
     assert limiter is not None
     assert callable(limiter.limit)
+
+
+def test_rate_limit_middleware_registered(client):
+    """Verify SlowAPIMiddleware is actually registered in the app"""
+    from slowapi.middleware import SlowAPIMiddleware
+    
+    # Uses client fixture which internally imports app
+    # Check middleware stack - SlowAPIMiddleware must be present
+    app = client.app
+    middleware_found = False
+    
+    # Check user_middleware for SlowAPIMiddleware
+    for middleware in app.user_middleware:
+        middleware_cls = middleware.cls if hasattr(middleware, 'cls') else type(middleware)
+        if middleware_cls.__name__ == 'SlowAPIMiddleware' or isinstance(middleware_cls, type(SlowAPIMiddleware)):
+            middleware_found = True
+            break
+    
+    assert middleware_found, \
+        "SlowAPIMiddleware not found in app.user_middleware - rate limits will not be enforced!"
+
+
+@pytest.mark.integration
+def test_rate_limit_enforcement_with_test_client(client):
+    """Integration: Rate limiting should actually block requests"""
+    # Uses client fixture from conftest.py which includes mocked dependencies
+    
+    # Test auth endpoint which has @limiter.limit("5/minute")
+    # Note: We expect auth to fail (401/422) but NOT with 429 until limit is hit
+    
+    responses = []
+    for i in range(8):  # Try more than the 5/minute limit
+        resp = client.post(
+            "/v1/auth/login",
+            json={"username": "testuser", "password": "wrongpass"}
+        )
+        responses.append((i+1, resp.status_code))
+    
+    # Check if we got any 429 responses (rate limited)
+    rate_limited_responses = [r for r in responses if r[1] == 429]
+    
+    # If rate limiting is working, we should see 429 responses after the 5th request
+    # If middleware is missing, we'll never see 429
+    assert len(rate_limited_responses) > 0, \
+        f"No 429 responses found in {len(responses)} requests. Rate limiting not enforced! Responses: {responses}"
+    
+    # Verify FIRE error format on rate-limited response
+    resp_429 = client.post(
+        "/v1/auth/login",
+        json={"username": "testuser", "password": "wrongpass"}
+    )
+    
+    if resp_429.status_code == 429:
+        body = resp_429.json()
+        assert body["error_code"] == "FIRE-429", f"Expected FIRE-429 error code, got {body}"
+        assert "retry_after" in body, "Missing retry_after field"
+        assert body["retryable"] is True, "Should be retryable"
