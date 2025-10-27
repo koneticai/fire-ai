@@ -28,13 +28,13 @@ jobs:
       - name: Lint/Format (if tools present)
         run: |
           source .venv/bin/activate
-          if command -v ruff >/dev/null 2>&1; then ruff check . || true; fi
-          if command -v black >/dev/null 2>&1; then black --check . || true; fi
+          if command -v ruff >/dev/null 2>&1; then ruff check .; fi
+          if command -v black >/dev/null 2>&1; then black --check .; fi
 
       - name: Tests
         run: |
           source .venv/bin/activate
-          pytest -q || true
+          pytest -q
 
   node:
     if: ${{ hashFiles('package.json') != '' }}
