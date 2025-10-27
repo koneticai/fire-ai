@@ -29,10 +29,29 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONRe
     """
     Custom rate limit exceeded handler with structured FIRE error response.
     Aligns with: AGENTS.md - Security Gate, data_model.md - Error Standards
+    
+    Note: slowapi's RateLimitExceeded doesn't expose retry_after or limit details,
+    so we use sensible defaults. For production, consider implementing a rate limit
+    registry to map endpoints to their configured limits.
     """
     logger.warning(
         f"Rate limit exceeded: {request.client.host if request.client else 'unknown'} -> {request.url.path}"
     )
+    
+    # Default values (slowapi doesn't expose limit details in exception)
+    retry_after = 60  # Conservative default
+    rate_limit = "1000"  # Global default from limiter configuration
+    
+    # Try to determine endpoint-specific limits from common patterns
+    if "/auth/login" in request.url.path:
+        retry_after = 60  # 5/minute limit
+        rate_limit = "5"
+    elif "/evidence" in request.url.path:
+        retry_after = 3600  # 100/hour limit
+        rate_limit = "100"
+    elif "/reports" in request.url.path:
+        retry_after = 3600  # 10/hour limit
+        rate_limit = "10"
     
     return JSONResponse(
         status_code=429,
@@ -41,11 +60,11 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONRe
             "error_code": "FIRE-429",
             "message": "Rate limit exceeded. Please try again later.",
             "retryable": True,
-            "retry_after": exc.detail if hasattr(exc, 'detail') else "60"
+            "retry_after": str(retry_after)
         },
         headers={
-            "Retry-After": str(exc.detail) if hasattr(exc, 'detail') else "60",
-            "X-RateLimit-Limit": request.headers.get("X-RateLimit-Limit", "unknown"),
+            "Retry-After": str(retry_after),
+            "X-RateLimit-Limit": rate_limit,
             "X-RateLimit-Remaining": "0"
         }
     )

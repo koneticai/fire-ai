@@ -166,11 +166,17 @@ from slowapi.middleware import SlowAPIMiddleware
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
-app.add_middleware(SlowAPIMiddleware)
 
-# Add security headers middleware (FIRST - applies to all responses)
+# Middleware execution order (LIFO - Last added runs FIRST on requests):
+# Order: SecurityHeaders -> SlowAPI -> Concurrency -> Performance -> Route Handler
+# This ensures security headers wrap all responses and rate limiting happens early
+
+# Add security headers middleware (added last, runs first - wraps all responses)
 from .middleware.security_headers import SecurityHeadersMiddleware
 app.add_middleware(SecurityHeadersMiddleware)
+
+# Add rate limiting middleware (enforces rate limits before reaching endpoints)
+app.add_middleware(SlowAPIMiddleware)
 
 # Add concurrency middleware for vector clock detection
 from .middleware.concurrency import detect_concurrent_writes

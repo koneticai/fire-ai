@@ -27,14 +27,40 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         
         # Content Security Policy - prevent XSS
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: https:; "
-            "font-src 'self' data:; "
-            "connect-src 'self'"
-        )
+        # Production uses strict CSP (no unsafe-inline/unsafe-eval)
+        # Development allows inline scripts for hot reload, debugging
+        env = os.getenv("ENVIRONMENT", "development")
+        
+        if env == "production":
+            # Strict CSP for production - no XSS vectors
+            csp = (
+                "default-src 'self'; "
+                "base-uri 'self'; "
+                "frame-ancestors 'none'; "
+                "object-src 'none'; "
+                "form-action 'self'; "
+                "script-src 'self'; "
+                "style-src 'self'; "
+                "img-src 'self' data: https:; "
+                "font-src 'self' data:; "
+                "connect-src 'self'"
+            )
+        else:
+            # Relaxed CSP for development (allows inline scripts for hot reload, etc.)
+            csp = (
+                "default-src 'self'; "
+                "base-uri 'self'; "
+                "frame-ancestors 'none'; "
+                "object-src 'none'; "
+                "form-action 'self'; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+                "style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data: https:; "
+                "font-src 'self' data:; "
+                "connect-src 'self'"
+            )
+        
+        response.headers["Content-Security-Policy"] = csp
         
         # Prevent clickjacking
         response.headers["X-Frame-Options"] = "DENY"
