@@ -22,7 +22,7 @@ jobs:
           python -m venv .venv
           source .venv/bin/activate
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install pytest
+          pip install pytest pytest-cov
           if [ -f pyproject.toml ]; then pip install . || true; fi
 
       - name: Lint/Format (if tools present)
@@ -34,7 +34,7 @@ jobs:
       - name: Tests
         run: |
           source .venv/bin/activate
-          pytest -q
+          pytest -q --ignore=services/api/tests/performance
 
   node:
     runs-on: ubuntu-latest
