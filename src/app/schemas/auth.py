@@ -4,13 +4,14 @@ Authentication schemas for FireMode Compliance Platform
 
 from pydantic import BaseModel, Field
 import uuid
-from typing import Optional
+from typing import Optional, List
 
 
 class TokenPayload(BaseModel):
-    """Token payload schema - renamed from TokenData to avoid import collision"""
+    """Token payload schema with RBAC support - renamed from TokenData to avoid import collision"""
     user_id: uuid.UUID = Field(..., description="User identifier")
     username: str = Field(..., description="Username")
+    roles: List[str] = Field(default_factory=list, description="User roles (e.g., engineer, admin)")
     jti: Optional[uuid.UUID] = Field(None, description="JWT ID for revocation list")
     exp: Optional[int] = Field(None, description="Expiration timestamp")
 

@@ -378,7 +378,7 @@ class CETestReport(Base):
     )
     finalized_by = Column(
         UUID(as_uuid=True),
-        ForeignKey('users.id'),
+        ForeignKey('users.id', ondelete='SET NULL'),
         nullable=True,
         doc="Engineer who finalized this report"
     )

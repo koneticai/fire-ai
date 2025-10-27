@@ -249,18 +249,20 @@ class TestEvidenceWormUpload:
                     
                     assert response.status_code == 200
                     
-                    # Query audit log from database
-                    result = await db_session.execute(
-                        select(AuditLog)
-                        .where(AuditLog.action == "UPLOAD_EVIDENCE_WORM")
-                        .order_by(AuditLog.created_at.desc())
-                    )
-                    audit_logs = result.scalars().all()
+                    # Verify audit log was created on the mocked session
+                    assert db_session.add.call_count >= 1, "AuditLog not added to session"
                     
-                    # Verify audit log was created
-                    assert len(audit_logs) > 0
-                    latest_log = audit_logs[0]
+                    # Get the audit log from the add() call
+                    audit_log_calls = [
+                        call for call in db_session.add.call_args_list
+                        if len(call[0]) > 0 and isinstance(call[0][0], AuditLog)
+                    ]
+                    assert len(audit_log_calls) > 0, "No AuditLog instances added"
                     
+                    latest_log = audit_log_calls[-1][0][0]  # Get the AuditLog instance
+                    
+                    # Verify audit log properties
+                    assert isinstance(latest_log, AuditLog)
                     assert latest_log.action == "UPLOAD_EVIDENCE_WORM"
                     assert latest_log.resource_type == "evidence"
                     assert str(latest_log.resource_id) == test_evidence_id

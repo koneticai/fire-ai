@@ -519,10 +519,13 @@ async def finalize_report(
     """
     logger.info(f"Finalizing report {report_id} by user {current_user.user_id}")
     
-    # Engineer role validation
-    # Check if username ends with "_engineer" suffix
-    if not str(current_user.username).endswith("_engineer"):
-        logger.warning(f"Non-engineer user {current_user.username} attempted to finalize report {report_id}")
+    # Engineer role validation - RBAC check
+    roles = getattr(current_user, "roles", [])
+    if "engineer" not in roles:
+        logger.warning(
+            f"Non-engineer user {current_user.username} (roles: {roles}) "
+            f"attempted to finalize report {report_id}"
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
@@ -565,7 +568,7 @@ async def finalize_report(
         )
         
         # Upload to WORM storage
-        worm_bucket = os.getenv('WORM_REPORTS_BUCKET', 'fireai-reports-worm')
+        worm_bucket = os.getenv('WORM_REPORTS_BUCKET', 'firemode-reports-worm')
         worm_uploader = WormStorageUploader(bucket_name=worm_bucket, retention_years=7)
         
         # Generate S3 key
@@ -619,7 +622,7 @@ async def finalize_report(
             user_id=current_user.user_id,
             action="FINALIZE_REPORT_WORM",
             resource_type="ce_test_report",
-            resource_id=str(report_id),
+            resource_id=report_id,
             old_values=old_values,
             new_values={
                 "finalized": True,
