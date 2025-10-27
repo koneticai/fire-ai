@@ -37,15 +37,33 @@ jobs:
           pytest -q || true
 
   node:
-    if: ${{ hashFiles('package.json') != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Check for package.json
+        id: check-package
+        run: |
+          if [ -f package.json ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+      
       - uses: actions/setup-node@v4
+        if: steps.check-package.outputs.exists == 'true'
         with:
           node-version: 20
           cache: npm
+      
       - run: npm ci
+        if: steps.check-package.outputs.exists == 'true'
+      
       - run: npm run typecheck --if-present
+        if: steps.check-package.outputs.exists == 'true'
+      
       - run: npm run lint --if-present
+        if: steps.check-package.outputs.exists == 'true'
+      
       - run: npm test --if-present
+        if: steps.check-package.outputs.exists == 'true'
