@@ -3,7 +3,7 @@ Calibration certificate model per AS 1851-2012 requirements.
 All measurement instruments must have valid calibration certificates.
 """
 
-from sqlalchemy import Column, String, Date, Text, DateTime, ForeignKey
+from sqlalchemy import Column, String, Date, Text, DateTime, ForeignKey, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import date
@@ -28,7 +28,7 @@ class CalibrationCertificate(Base):
     expiry_date = Column(Date, nullable=False, index=True)
     cert_file_path = Column(Text, nullable=True)
     calibration_lab = Column(String(255), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default="now()")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     
     # Relationship

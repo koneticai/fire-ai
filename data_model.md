@@ -16,17 +16,20 @@
 
 ## Table of Contents
 
-1. [Quick Reference](#1-quick-reference)
-2. [Entity Relationship Diagram](#2-entity-relationship-diagram)
-3. [Service Layer Models](#3-service-layer-models)
-4. [System Architecture](#4-system-architecture)
-5. [Data Flow Sequences](#5-data-flow-sequences)
-6. [Special Features & Design Patterns](#6-special-features--design-patterns)
-7. [Usage Examples & Query Patterns](#7-usage-examples--query-patterns)
-8. [API Integration](#8-api-integration)
-9. [Compliance & Audit Trail](#9-compliance--audit-trail)
-10. [Scalability & Future Roadmap](#10-scalability--future-roadmap)
-11. [Related Code & Resources](#11-related-code--resources)
+1. [Entity Relationship Diagram](#fireai-data-model---entity-relationship-diagram)
+   - [Overview](#overview)
+   - [Database Schema Entity Relationship Diagram](#database-schema-entity-relationship-diagram)
+2. [Service Layer Architecture](#service-layer-architecture)
+3. [Data Flow Architecture](#data-flow-architecture)
+4. [Special Features & Annotations](#special-features--annotations)
+5. [Index Strategy](#index-strategy)
+6. [Database Constraints](#database-constraints)
+7. [API to Database Mapping](#api-to-database-mapping)
+8. [Usage Examples](#usage-examples)
+9. [Compliance & Audit Trail](#compliance--audit-trail)
+10. [Future Extensibility](#future-extensibility)
+11. [Architecture Visual Overview](#fireai-architecture---visual-overview)
+12. [Quick Reference](#fireai-data-model---quick-reference)
 
 ---
 
@@ -837,7 +840,7 @@ Enables time-travel debugging
 1. **[ERD.md](./ERD.md)** - Complete entity relationship diagram with database schema details
 2. **[ARCHITECTURE_DIAGRAM.md](./ARCHITECTURE_DIAGRAM.md)** - System architecture and data flow visualizations
 
-## Database Tables (8 Core Tables)
+## Database Tables (9 Core Tables)
 
 ### Domain Entities
 1. **users** - User accounts with encrypted PII (Fernet)
@@ -845,11 +848,12 @@ Enables time-travel debugging
 3. **test_sessions** - Fire safety testing sessions with CRDT support
 4. **evidence** - Compliance evidence files and data
 5. **as1851_rules** - Versioned, immutable compliance rules
+6. **calibration_certificates** - AS 1851-2012 instrument calibration tracking
 
 ### Infrastructure
-6. **token_revocation_list** - JWT security (RTL)
-7. **idempotency_keys** - Request deduplication
-8. **audit_log** - Complete compliance audit trail
+7. **token_revocation_list** - JWT security (RTL)
+8. **idempotency_keys** - Request deduplication
+9. **audit_log** - Complete compliance audit trail
 
 ## Key Relationships
 

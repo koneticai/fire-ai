@@ -20,6 +20,10 @@ depends_on = None
 
 def upgrade():
     """Create calibration certificates table"""
+    
+    # Ensure uuid-ossp extension exists for uuid_generate_v4()
+    op.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
+    
     op.create_table(
         'calibration_certificates',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, 
@@ -52,15 +56,16 @@ def upgrade():
     )
     
     # Indexes for performance
-    op.create_index('idx_calib_instrument', 'calibration_certificates', ['instrument_id'])
+    # Note: instrument_id has unique=True which already creates an index
     op.create_index('idx_calib_expiry', 'calibration_certificates', ['expiry_date'])
     op.create_index('idx_calib_type', 'calibration_certificates', ['instrument_type'])
+    op.create_index('idx_calib_created_by', 'calibration_certificates', ['created_by'])
 
 
 def downgrade():
     """Remove calibration certificates table"""
+    op.drop_index('idx_calib_created_by', 'calibration_certificates')
     op.drop_index('idx_calib_type', 'calibration_certificates')
     op.drop_index('idx_calib_expiry', 'calibration_certificates')
-    op.drop_index('idx_calib_instrument', 'calibration_certificates')
     op.drop_constraint('chk_calibration_dates', 'calibration_certificates', type_='check')
     op.drop_table('calibration_certificates')

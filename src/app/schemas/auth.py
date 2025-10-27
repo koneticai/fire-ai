@@ -12,8 +12,12 @@ class TokenPayload(BaseModel):
     user_id: uuid.UUID = Field(..., description="User identifier")
     username: str = Field(..., description="Username")
     roles: List[str] = Field(default_factory=list, description="User roles (e.g., engineer, admin)")
-    jti: Optional[uuid.UUID] = Field(None, description="JWT ID for revocation list")
+    jti: Optional[str] = Field(None, description="JWT ID for revocation list")
     exp: Optional[int] = Field(None, description="Expiration timestamp")
+
+
+# Backward compatibility alias
+TokenData = TokenPayload
 
 
 class LoginRequest(BaseModel):
@@ -27,3 +31,7 @@ class LoginResponse(BaseModel):
     access_token: str = Field(..., description="JWT access token")
     token_type: str = Field(default="bearer", description="Token type")
     expires_in: int = Field(..., description="Token expiration in seconds")
+
+
+# Export both names for backward compatibility
+__all__ = ["TokenPayload", "TokenData", "LoginRequest", "LoginResponse"]

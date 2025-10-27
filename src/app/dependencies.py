@@ -103,20 +103,11 @@ def verify_token(token: str) -> TokenPayload:
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        # Validate jti is a valid UUID format
-        try:
-            jti_uuid = UUID(jti) if jti else None
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token - malformed jti",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
+        # JTI is a string (JWT standard), not UUID
         token_data = TokenPayload(
             username=username,
             user_id=user_uuid,
-            jti=jti_uuid,
+            jti=jti,
             exp=exp
         )
         return token_data
