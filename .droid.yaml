@@ -10,8 +10,9 @@ project:
 workflows:
   review:
     planPrompt: |
-      Produce a concise plan (files, tests, risks). Do NOT make code changes yet.
-      Confirm any data-touching change is aligned with ./data_model.md (Single Source of Truth).
+      Read AGENTS.md and ./data_model.md first.
+      Produce a concise plan (files, tests, risks, rollback). Do NOT change code yet.
+      Call out any data-impacting work and how it aligns with ./data_model.md (SoT).
     reviewPrompt: |
       Review the diff for correctness, tests, and Security Gate (see AGENTS.md): validation, authZ,
       JWT/Fernet/Argon2, and DB indexes per ./data_model.md. Propose small incremental improvements.
@@ -19,8 +20,8 @@ workflows:
 
   implement_small_diff:
     planPrompt: |
-      Plan a change limited to 30–75 LOC with tests. Reference ./data_model.md for schema/services/UI impacts.
-      Prefer additive migrations; avoid destructive changes.
+      Read AGENTS.md and ./data_model.md first.
+      Plan a 30–75 LOC change with tests; prefer additive migrations; cite the ERD/sections touched.
     changePrompt: |
       Apply minimal changes with inline comments and tests. If migrations are needed, add Alembic scripts.
     autoRun: low
