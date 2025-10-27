@@ -21,9 +21,13 @@ jobs:
         run: |
           python -m venv .venv
           source .venv/bin/activate
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install pytest pytest-cov
-          if [ -f pyproject.toml ]; then pip install . || true; fi
+          # Install from services/api if it exists (newer structure)
+          if [ -f services/api/pyproject.toml ]; then 
+            pip install jsonschema fastapi pydantic sqlalchemy httpx python-jose cryptography
+          elif [ -f pyproject.toml ]; then 
+            pip install -e . || echo "Warning: Could not install project dependencies"
+          fi
 
       - name: Lint/Format (if tools present)
         run: |
