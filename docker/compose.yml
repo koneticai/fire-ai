@@ -1,0 +1,15 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:16-alpine # target 16, compatible with 14+ per SoT
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: app
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
