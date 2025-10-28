@@ -33,6 +33,7 @@ from ..schemas.ce_test import (
     CETestStatus,
 )
 from ..services.ce_deviation_analyzer import CEDeviationAnalyzer
+from ..services.baseline_service import baseline_service
 
 router = APIRouter(prefix="/v1/ce/tests", tags=["ce_tests"])
 
@@ -376,15 +377,51 @@ async def analyze_ce_test_session(
     db: AsyncSession = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_active_user),
 ):
-    """Trigger deviation analysis for a session and persist results."""
+    """Trigger deviation analysis for a session and persist results.
+    
+    AS 1851-2012 Compliance:
+    - First inspection: Establishes baseline from measurements
+    - Subsequent inspections: Compare to baseline (10% warning, 20% critical)
+    - Critical deviations trigger 24-hour notification
+    """
 
     session = await _get_session_for_user(session_id, current_user, db, eager=True)
 
     if payload.test_session_id != session.id:
         raise HTTPException(status_code=400, detail="Payload session does not match path parameter")
+    
+    # Check if baseline exists for this building
+    building_id = str(session.building_id)
+    baseline = await baseline_service.get_baseline(building_id, db)
+    
+    # If no baseline, establish from current measurements
+    if not baseline and session.measurements:
+        # Extract measurement values for baseline
+        measurement_values = {}
+        for measurement in session.measurements:
+            mtype = measurement.measurement_type.lower()
+            if 'pressure' in mtype:
+                measurement_values['pressure'] = measurement.measurement_value
+            elif 'velocity' in mtype:
+                measurement_values['velocity'] = measurement.measurement_value
+            elif 'force' in mtype:
+                measurement_values['force'] = measurement.measurement_value
+        
+        if measurement_values:
+            baseline = await baseline_service.establish_baseline(
+                building_id=building_id,
+                measurements=measurement_values,
+                created_by=str(current_user.user_id),
+                db=db
+            )
 
     analyzer = CEDeviationAnalyzer(db)
     try:
-        return await analyzer.analyze_session(session.id, include_recommendations=payload.include_recommendations)
+        # Run analysis with baseline comparison if baseline exists
+        return await analyzer.analyze_session(
+            session.id,
+            include_recommendations=payload.include_recommendations,
+            compare_baseline=(baseline is not None)
+        )
     except Exception as exc:  # pragma: no cover - unexpected errors bubbled as 500
         raise HTTPException(status_code=500, detail="Failed to analyze session") from exc
