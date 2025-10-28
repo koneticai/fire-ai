@@ -363,6 +363,41 @@ class CETestReport(Base):
         doc="Whether this is the final report for the session"
     )
     
+    # Finalization fields (AS 1851-2012 compliance)
+    finalized = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default='false',
+        doc="Whether this report has been finalized with engineer sign-off"
+    )
+    finalized_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        doc="When the report was finalized"
+    )
+    finalized_by = Column(
+        UUID(as_uuid=True),
+        ForeignKey('users.id', ondelete='SET NULL'),
+        nullable=True,
+        doc="Engineer who finalized this report"
+    )
+    engineer_signature_s3_uri = Column(
+        Text,
+        nullable=True,
+        doc="S3 URI of WORM-protected finalized report with signature"
+    )
+    engineer_license_number = Column(
+        String(100),
+        nullable=True,
+        doc="License number of the finalizing engineer"
+    )
+    compliance_statement = Column(
+        Text,
+        nullable=True,
+        doc="Compliance statement provided during finalization"
+    )
+    
     # Timestamps
     generated_at = Column(
         DateTime(timezone=True), 

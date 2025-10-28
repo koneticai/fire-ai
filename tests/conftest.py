@@ -14,8 +14,9 @@ import os
 
 # Set test environment
 os.environ["TESTING"] = "true"
-os.environ["JWT_SECRET_KEY"] = "test-secret-key"
-os.environ["INTERNAL_JWT_SECRET_KEY"] = "test-internal-key"
+os.environ["JWT_SECRET_KEY"] = "test-secret-key-12345678901234567890123456789012"
+os.environ["INTERNAL_JWT_SECRET_KEY"] = "test-internal-key-12345678901234567890123456789012"
+os.environ["DATABASE_URL"] = "postgresql+asyncpg://test:test@localhost:5432/test_db"
 
 
 @pytest.fixture(scope="session")
@@ -75,3 +76,27 @@ def client(override_get_current_user, async_session):
 def authenticated_headers():
     """Headers with valid test token."""
     return {"Authorization": "Bearer test-token"}
+
+@pytest.fixture
+def auth_headers():
+    """Alias for authenticated_headers for compatibility."""
+    return {"Authorization": "Bearer test-token"}
+
+@pytest.fixture
+def db_session():
+    """Alias for async_session for compatibility."""
+    session = AsyncMock(spec=AsyncSession)
+    
+    # Mock query results
+    mock_result = MagicMock()
+    mock_result.scalars.return_value.all.return_value = []
+    mock_result.scalar.return_value = 0
+    mock_result.scalar_one_or_none.return_value = None
+    
+    session.execute = AsyncMock(return_value=mock_result)
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    session.add = MagicMock()
+    session.refresh = AsyncMock()
+    
+    return session

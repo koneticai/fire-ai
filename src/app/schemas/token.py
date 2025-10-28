@@ -10,7 +10,7 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     user_id: Optional[uuid.UUID] = Field(None, description="User identifier")
     username: Optional[str] = Field(None, description="Username")
-    jti: Optional[uuid.UUID] = Field(None, description="JWT ID for revocation list")
+    jti: Optional[str] = Field(None, description="JWT ID for revocation list")
     exp: Optional[int] = Field(None, description="Expiration timestamp")
 
 class APIResponse(BaseModel):
