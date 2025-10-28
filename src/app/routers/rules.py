@@ -14,31 +14,22 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from ..models import (
     AS1851Rule, AS1851RuleCreate
 )
+from ..schemas.token import APIResponse
+from pydantic import BaseModel
+from typing import List, Any, Optional
 
-# Import classification models if available, otherwise create simple placeholders
-try:
-    from ..models import FaultClassificationRequest, FaultClassificationResult
-    from ..schemas.token import APIResponse
-except ImportError:
-    from ..schemas.token import APIResponse
-    from pydantic import BaseModel
-    from typing import List, Any, Optional
-    
-    class FaultClassificationRequest(BaseModel):
-        evidence_id: str
-        rule_codes: List[str]
-        context: Optional[str] = None
-    
-    class FaultClassificationResult(BaseModel):
-        classification_id: str
-        evidence_id: str
-        classifications: List[Any]
-        confidence_scores: dict
-        applied_rules: List[str]
-        
-    class APIResponse(BaseModel):
-        message: str
-        data: Optional[Any] = None
+# Legacy classification models (kept for backward compatibility)
+class FaultClassificationRequest(BaseModel):
+    evidence_id: str
+    rule_codes: List[str]
+    context: Optional[str] = None
+
+class FaultClassificationResult(BaseModel):
+    classification_id: str
+    evidence_id: str
+    classifications: List[Any]
+    confidence_scores: dict
+    applied_rules: List[str]
 from ..dependencies import get_current_active_user
 from ..database.core import get_db
 from sqlalchemy.ext.asyncio import AsyncSession

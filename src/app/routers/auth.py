@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from ..schemas.token import TokenData, APIResponse
 from ..dependencies import get_current_active_user
 from ..database.core import get_db
+from ..middleware.rate_limiter import limiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(tags=["Authentication"])
@@ -30,6 +31,7 @@ async def debug_config():
     }
 
 @router.post("/logout", response_model=APIResponse, summary="Logout User", description="Revoke the current user's JWT token by adding it to the revocation list")
+@limiter.limit("5/minute")
 async def logout(
     request: Request,
     current_user: TokenData = Depends(get_current_active_user),

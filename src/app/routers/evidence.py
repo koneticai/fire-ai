@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies import get_current_active_user
 from ..database.core import get_db
+from ..middleware.rate_limiter import limiter
 from ..models.test_sessions import TestSession
 from ..models.evidence import Evidence
 from ..models.defects import Defect
@@ -80,12 +81,13 @@ def validate_device_attestation(headers: dict) -> bool:
 
 
 @router.post("/submit", response_model=EvidenceResponse)
+@limiter.limit("100/hour")
 async def submit_evidence(
+    request: Request,
     session_id: str = Form(..., description="Test session ID"),
     evidence_type: str = Form(..., description="Type of evidence (photo, video, document, etc.)"),
     file: UploadFile = File(..., description="Evidence file to upload"),
     metadata: Optional[str] = Form(None, description="Additional metadata as JSON string"),
-    request: Request = None,
     db: AsyncSession = Depends(get_db),
     current_user: TokenData = Depends(get_current_active_user),
     proxy: GoServiceProxy = Depends(get_go_service_proxy)

@@ -1,3 +1,0 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { tokens } from '../tokens';
-export const CostOverview = () => (_jsxs("section", { role: "region", "aria-label": "Cost Overview", "aria-live": "polite", style: { padding: tokens.spacing.md }, children: [_jsx("h1", { style: { fontSize: tokens.typography.fontSize.xl, marginTop: 0 }, children: "Cost Overview" }), _jsx("p", { children: "Total (mock): $12,345" }), _jsx("div", { role: "progressbar", "aria-valuenow": 70, "aria-valuemin": 0, "aria-valuemax": 100, "aria-label": "Budget used", style: { height: 12, background: '#E9ECEF', borderRadius: 6 }, children: _jsx("div", { style: { width: '70%', height: '100%', background: tokens.colors.warning, borderRadius: 6 } }) })] }));

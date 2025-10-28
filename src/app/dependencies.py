@@ -4,7 +4,7 @@ Consolidated version with async-only JWT validation and proper RTL checking
 """
 
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -20,7 +20,23 @@ from .models.rtl import TokenRevocationList
 from .schemas.token import TokenData
 from .schemas.auth import TokenPayload
 
+ALLOWED_JWT_ALGORITHMS = ("HS256",)
+
 security = HTTPBearer()
+
+
+async def is_token_revoked(db: AsyncSession, jti: Optional[UUID]) -> bool:
+    """Check revocation status per token_revocation_list semantics (data_model.md)."""
+    if jti is None:
+        return False
+
+    result = await db.execute(
+        select(TokenRevocationList).where(
+            TokenRevocationList.token_jti == str(jti),
+            TokenRevocationList.expires_at > datetime.now(timezone.utc)
+        )
+    )
+    return result.scalar_one_or_none() is not None
 
 async def get_current_active_user(
     token: HTTPAuthorizationCredentials = Depends(security),
@@ -32,17 +48,11 @@ async def get_current_active_user(
         token_data = verify_token(token.credentials)
         
         # Check RTL using async SQLAlchemy operations
-        if token_data.jti:
-            result = await db.execute(
-                select(TokenRevocationList).where(
-                    TokenRevocationList.token_jti == str(token_data.jti)
-                )
+        if token_data.jti and await is_token_revoked(db, token_data.jti):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has been revoked"
             )
-            if result.scalar_one_or_none():
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Token has been revoked"
-                )
         
         return token_data
         
@@ -94,7 +104,17 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 def verify_token(token: str) -> TokenPayload:
     """Verify JWT token and return token data"""
     try:
-        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.algorithm])
+        payload = jwt.decode(
+            token,
+            settings.jwt_secret_key,
+            algorithms=list(ALLOWED_JWT_ALGORITHMS),
+            options={
+                "verify_signature": True,
+                "verify_exp": True,
+                "verify_nbf": True,
+                "require_exp": True,
+            },
+        )
         username = payload.get("sub")
         user_id = payload.get("user_id")
         jti = payload.get("jti")

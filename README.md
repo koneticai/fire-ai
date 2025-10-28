@@ -144,3 +144,43 @@ curl -H "Authorization: Bearer <your-jwt-token>" \
 - Token Revocation List (RTL) support
 - 24-hour expiration for demo tokens
 - Unique JTI (JWT ID) for each token
+
+---
+## 🤖 Agents & Single Source of Truth
+Project truth lives in **`./data_model.md`** (root).  
+- **Single Source of Truth (SoT):** `./data_model.md` — reference it for any schema/service/UI change.  
+- **Agent playbook:** `AGENTS.md` — tool-agnostic rules (small diffs, security gate, PR checklist).  
+- **Droid config:** `.droid.yaml` — behavior for Factory Droid.  
+- **Cursor rules:** `.cursor/rules/high-impact.mdc` — thin and defers to `AGENTS.md` + SoT.  
+- **Vendor companion:** [/docs/agents/droid-best-practice.md](/docs/agents/droid-best-practice.md) — Droid workflows and troubleshooting.
+
+### Mandatory workflow
+1) Plan small changes (30–75 LOC) **referencing `./data_model.md`**.  
+2) Prefer **additive** migrations; avoid destructive changes unless planned with backup/rollback.  
+3) Run tests; summarize diffs and risks in the PR.
+
+---
+## 🔐 Security Setup (aligned with data_model.md)
+- **JWT:** short-lived tokens; maintain a **revocation list (RTL)**.  
+- **Fernet:** generate `FERNET_KEY` and store in `.env` (do not commit).  
+- **Argon2:** use for password hashing.  
+- **PostgreSQL:** target **16** (compatible with **14+**); ensure JSONB columns with **GIN** indexes per SoT.
+
+**Example `.env` additions (placeholders):**
+
+```bash
+JWT_SECRET=changeme
+JWT_EXPIRES_IN_SECONDS=900
+FERNET_KEY=changeme_base64_32bytes
+ARGON2_TIME_COST=3
+ARGON2_MEMORY_COST=65536
+ARGON2_PARALLELISM=2
+```
+
+---
+## 🧭 PR Checklist (paste into PRs)
+- [ ] Small, reviewable diff; tests added/updated  
+- [ ] Change references `./data_model.md` (SoT)  
+- [ ] Security Gate: validation, authZ, JWT/RTL, Fernet, Argon2  
+- [ ] DB indexes/constraints match SoT (JSONB/GIN, FK/unique/temporal)  
+- [ ] Rollback plan considered (if needed)
