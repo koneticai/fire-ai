@@ -47,7 +47,7 @@ jobs:
         continue-on-error: true
         env:
           PYTHONPATH: ${{ env.PYTHONPATH }}
-        run: poetry run pylint --exit-zero src/app || true
+        run: poetry run pylint --exit-zero src/app
 
   test-python:
     runs-on: ubuntu-latest
@@ -82,9 +82,8 @@ jobs:
           AWS_EC2_METADATA_DISABLED: "true"
         run: |
           poetry run pytest tests/ -v \
-            --cov=src --cov-report=xml --cov-report=term-missing \
-            || true
-        continue-on-error: true
+            --ignore=tests/performance \
+            --cov=src --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -151,14 +150,12 @@ jobs:
       - name: Build Go service
         if: steps.gosvc.outputs.exists == 'true'
         working-directory: ${{ steps.gosvc.outputs.path }}
-        run: go build -v ./... || true
-        continue-on-error: true
+        run: go build -v ./...
 
       - name: Test Go service
         if: steps.gosvc.outputs.exists == 'true'
         working-directory: ${{ steps.gosvc.outputs.path }}
-        run: go test -v ./... || true
-        continue-on-error: true
+        run: go test -v ./...
 
       - name: Skip Go build (not present)
         if: steps.gosvc.outputs.exists == 'false'
