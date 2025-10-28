@@ -76,7 +76,9 @@ async def list_ce_test_sessions(
         try:
             status_values = [CETestStatus(value).value for value in status]
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail="Invalid status filter") from exc
+            raise HTTPException(
+                status_code=400, detail="Invalid status filter"
+            ) from exc
         stmt = stmt.where(CETestSession.status.in_(status_values))
 
     if building_id:
@@ -237,7 +239,9 @@ async def add_ce_test_measurement(
     session = await _get_session_for_user(session_id, current_user, db)
 
     if payload.test_session_id != session.id:
-        raise HTTPException(status_code=400, detail="Payload session does not match path parameter")
+        raise HTTPException(
+            status_code=400, detail="Payload session does not match path parameter"
+        )
 
     timestamp = payload.timestamp or datetime.now(timezone.utc)
 
@@ -301,7 +305,9 @@ async def add_ce_test_deviation(
     session = await _get_session_for_user(session_id, current_user, db)
 
     if payload.test_session_id != session.id:
-        raise HTTPException(status_code=400, detail="Payload session does not match path parameter")
+        raise HTTPException(
+            status_code=400, detail="Payload session does not match path parameter"
+        )
 
     deviation = CETestDeviation(
         id=uuid.uuid4(),
@@ -344,12 +350,16 @@ async def update_ce_test_deviation(
         raise HTTPException(status_code=404, detail="C&E deviation not found")
 
     if deviation.test_session.created_by != current_user.user_id:
-        raise HTTPException(status_code=403, detail="Not authorized to update this deviation")
+        raise HTTPException(
+            status_code=403, detail="Not authorized to update this deviation"
+        )
 
     updates = payload.model_dump(exclude_unset=True)
     if "resolved_by" in updates and updates["resolved_by"] is not None:
         if updates["resolved_by"] != current_user.user_id:
-            raise HTTPException(status_code=400, detail="Resolved by must match current user")
+            raise HTTPException(
+                status_code=400, detail="Resolved by must match current user"
+            )
         deviation.resolved_at = datetime.now(timezone.utc)
 
     for field, value in updates.items():
@@ -378,7 +388,7 @@ async def analyze_ce_test_session(
     current_user: TokenPayload = Depends(get_current_active_user),
 ):
     """Trigger deviation analysis for a session and persist results.
-    
+
     AS 1851-2012 Compliance:
     - First inspection: Establishes baseline from measurements
     - Subsequent inspections: Compare to baseline (10% warning, 20% critical)
@@ -388,31 +398,27 @@ async def analyze_ce_test_session(
     session = await _get_session_for_user(session_id, current_user, db, eager=True)
 
     if payload.test_session_id != session.id:
-        raise HTTPException(status_code=400, detail="Payload session does not match path parameter")
-    
+        raise HTTPException(
+            status_code=400, detail="Payload session does not match path parameter"
+        )
+
     # Check if baseline exists for this building
     building_id = str(session.building_id)
     baseline = await baseline_service.get_baseline(building_id, db)
-    
+
     # If no baseline, establish from current measurements
     if not baseline and session.measurements:
-        # Extract measurement values for baseline
-        measurement_values = {}
-        for measurement in session.measurements:
-            mtype = measurement.measurement_type.lower()
-            if 'pressure' in mtype:
-                measurement_values['pressure'] = measurement.measurement_value
-            elif 'velocity' in mtype:
-                measurement_values['velocity'] = measurement.measurement_value
-            elif 'force' in mtype:
-                measurement_values['force'] = measurement.measurement_value
-        
+        # Extract measurement values for baseline using helper
+        measurement_values = baseline_service.extract_measurements_from_session(
+            session.measurements
+        )
+
         if measurement_values:
             baseline = await baseline_service.establish_baseline(
                 building_id=building_id,
                 measurements=measurement_values,
                 created_by=str(current_user.user_id),
-                db=db
+                db=db,
             )
 
     analyzer = CEDeviationAnalyzer(db)
@@ -421,7 +427,9 @@ async def analyze_ce_test_session(
         return await analyzer.analyze_session(
             session.id,
             include_recommendations=payload.include_recommendations,
-            compare_baseline=(baseline is not None)
+            compare_baseline=(baseline is not None),
         )
     except Exception as exc:  # pragma: no cover - unexpected errors bubbled as 500
-        raise HTTPException(status_code=500, detail="Failed to analyze session") from exc
+        raise HTTPException(
+            status_code=500, detail="Failed to analyze session"
+        ) from exc
