@@ -49,11 +49,12 @@ def setup_telemetry():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager to start/stop Go service"""
+    """Application lifespan manager to start/stop Go service and background workers"""
     global go_service_client
     
     # Get the process manager
     process_manager = get_go_service_manager()
+    defect_monitor_task = None
     
     try:
         # Setup telemetry
@@ -75,17 +76,39 @@ async def lifespan(app: FastAPI):
             logger.error("Failed to start Go service with process manager")
             # Continue without Go service for development
         
+        # Start defect monitor background worker (Task 3.2)
+        # Only start in production or when explicitly enabled
+        environment = os.getenv('ENVIRONMENT', 'development')
+        monitor_enabled = os.getenv('DEFECT_MONITOR_ENABLED', 'true').lower() == 'true'
+        
+        if monitor_enabled:
+            logger.info("Starting critical defect monitor (AS 1851-2012 SLA compliance)...")
+            from .workers.defect_monitor import start_defect_monitor
+            defect_monitor_task = await start_defect_monitor()
+            logger.info("Critical defect monitor started successfully")
+        else:
+            logger.info("Critical defect monitor disabled via configuration")
+        
         yield
         
     except Exception as e:
-        logger.error(f"Failed to start Go service: {e}")
-        # Continue without Go service for development
+        logger.error(f"Failed to start services: {e}")
+        # Continue for development
         yield
     
     finally:
         # Cleanup
         if go_service_client:
             await go_service_client.aclose()
+        
+        # Stop defect monitor
+        if defect_monitor_task and not defect_monitor_task.done():
+            logger.info("Stopping critical defect monitor...")
+            defect_monitor_task.cancel()
+            try:
+                await defect_monitor_task
+            except asyncio.CancelledError:
+                logger.info("Critical defect monitor stopped")
         
         # Stop Go service using process manager
         logger.info("Shutting down Go service...")
