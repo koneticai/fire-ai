@@ -1,5 +1,28 @@
 # FireAI Project Guidelines
 
+## Cowork vs Claude Code
+
+**Cowork mode is sandboxed** - no network access to external services:
+- ❌ Cannot connect to Supabase/PostgreSQL
+- ❌ Cannot push to GitHub
+- ❌ Cannot access external APIs
+
+**Use Claude Code for:**
+- Git operations (push, PR creation)
+- Database seeding/migrations
+- API testing against external services
+- Any task requiring network access
+
+**Use Cowork for:**
+- File creation and editing
+- Code generation
+- Local validation scripts
+- Documentation
+
+**Workflow:** Prepare files in Cowork → Execute network operations in Claude Code
+
+---
+
 ## Database Connection (Supabase)
 
 **Always use the Transaction Pooler connection**, not Direct Connection.

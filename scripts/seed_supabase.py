@@ -8,18 +8,31 @@ This script:
 3. Verifies the seeding
 
 Run locally (not in Cowork sandbox):
+    export DATABASE_URL="postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-[N]-[REGION].pooler.supabase.com:6543/postgres"
     pip install sqlalchemy psycopg2-binary
     python scripts/seed_supabase.py
 """
 
 import json
+import os
+import sys
 from datetime import datetime
 from pathlib import Path
 
-# Supabase connection string (URL-encoded password)
-DATABASE_URL = "postgresql://postgres.efxehdkquqbynavkfkdy:yh%2AhRngC33h@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
 
-# SQL to create table
+def get_database_url() -> str:
+    """Get DATABASE_URL from environment variable."""
+    url = os.getenv("DATABASE_URL")
+    if not url:
+        print("❌ DATABASE_URL environment variable not set")
+        print("\nSet it with:")
+        print('  export DATABASE_URL="postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-[N]-[REGION].pooler.supabase.com:6543/postgres"')
+        print("\nSee CLAUDE.md for connection string format.")
+        sys.exit(1)
+    return url
+
+
+# SQL to create table (includes category and test_frequency)
 CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS as1851_rules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -27,6 +40,8 @@ CREATE TABLE IF NOT EXISTS as1851_rules (
     version VARCHAR(50) NOT NULL,
     rule_name VARCHAR(255) NOT NULL,
     description TEXT,
+    category VARCHAR(100),
+    test_frequency VARCHAR(50),
     rule_schema JSONB NOT NULL,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -35,6 +50,8 @@ CREATE TABLE IF NOT EXISTS as1851_rules (
 );
 
 CREATE INDEX IF NOT EXISTS idx_as1851_rules_code ON as1851_rules(rule_code);
+CREATE INDEX IF NOT EXISTS idx_as1851_rules_category ON as1851_rules(category);
+CREATE INDEX IF NOT EXISTS idx_as1851_rules_frequency ON as1851_rules(test_frequency);
 CREATE INDEX IF NOT EXISTS idx_as1851_rules_schema ON as1851_rules USING GIN(rule_schema);
 """
 
@@ -49,7 +66,10 @@ def main():
         from sqlalchemy import create_engine, text
     except ImportError:
         print("❌ SQLAlchemy not installed. Run: pip install sqlalchemy psycopg2-binary")
-        return
+        sys.exit(1)
+
+    # Get database URL from environment
+    database_url = get_database_url()
 
     # Load rules JSON
     script_dir = Path(__file__).parent
@@ -57,17 +77,17 @@ def main():
 
     if not json_path.exists():
         print(f"❌ Rules file not found: {json_path}")
-        return
+        sys.exit(1)
 
     print(f"\n📂 Loading rules from: {json_path}")
-    with open(json_path) as f:
+    with open(json_path, encoding="utf-8") as f:
         rules = json.load(f)
     print(f"📊 Loaded {len(rules)} rules")
 
     # Connect to Supabase
     print(f"\n🔌 Connecting to Supabase...")
     try:
-        engine = create_engine(DATABASE_URL)
+        engine = create_engine(database_url)
         with engine.connect() as conn:
             # Test connection
             result = conn.execute(text("SELECT version()"))
@@ -95,18 +115,20 @@ def main():
                         skipped += 1
                         continue
 
-                    # Insert
+                    # Insert with category and test_frequency
                     conn.execute(
                         text("""
                             INSERT INTO as1851_rules
-                            (rule_code, version, rule_name, description, rule_schema, is_active, created_at, updated_at)
-                            VALUES (:code, :version, :name, :desc, :schema::jsonb, :active, :created, :updated)
+                            (rule_code, version, rule_name, description, category, test_frequency, rule_schema, is_active, created_at, updated_at)
+                            VALUES (:code, :version, :name, :desc, :category, :frequency, CAST(:schema AS jsonb), :active, :created, :updated)
                         """),
                         {
                             "code": rule["rule_code"],
                             "version": rule["version"],
                             "name": rule["rule_name"],
                             "desc": rule["description"],
+                            "category": rule.get("category", "unknown"),
+                            "frequency": rule.get("test_frequency", "unknown"),
                             "schema": json.dumps(rule["rule_schema"]),
                             "active": rule["is_active"],
                             "created": rule["created_at"],
@@ -138,18 +160,23 @@ def main():
 
             # Category breakdown
             result = conn.execute(text("""
-                SELECT
-                    CASE
-                        WHEN rule_code LIKE '%SP-%' THEN 'Stair Pressurization'
-                        WHEN rule_code LIKE '%FD-%' THEN 'Fire Doors'
-                        WHEN rule_code LIKE '%SC-%' THEN 'Smoke Control'
-                    END as category,
-                    COUNT(*) as count
+                SELECT category, COUNT(*) as count
                 FROM as1851_rules
-                GROUP BY 1
-                ORDER BY 1
+                GROUP BY category
+                ORDER BY category
             """))
             print(f"\n📋 By Category:")
+            for row in result:
+                print(f"   • {row[0]}: {row[1]} rules")
+
+            # Frequency breakdown
+            result = conn.execute(text("""
+                SELECT test_frequency, COUNT(*) as count
+                FROM as1851_rules
+                GROUP BY test_frequency
+                ORDER BY test_frequency
+            """))
+            print(f"\n📅 By Test Frequency:")
             for row in result:
                 print(f"   • {row[0]}: {row[1]} rules")
 
@@ -159,9 +186,11 @@ def main():
     except Exception as e:
         print(f"❌ Connection error: {e}")
         print("\nTroubleshooting:")
-        print("1. Check your network connection")
-        print("2. Verify the Supabase project is active")
-        print("3. Check the database password is correct")
+        print("1. Check DATABASE_URL environment variable is set correctly")
+        print("2. Use transaction pooler (port 6543), not direct connection")
+        print("3. Verify the Supabase project is active")
+        print("4. See CLAUDE.md for connection string format")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -30,7 +30,7 @@ Future Expansion:
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -116,7 +116,10 @@ def validate_rule_schema(rule: Dict[str, Any]) -> bool:
 
 def seed_rules(session, rules: List[Dict[str, Any]]) -> tuple[int, int, int]:
     """
-    Insert rules into as1851_rules table
+    Insert rules into as1851_rules table using savepoints for transaction safety.
+
+    Uses nested transactions (savepoints) so that individual rule failures
+    don't corrupt the session state, allowing the loop to continue safely.
 
     Returns:
         tuple: (inserted_count, skipped_count, error_count)
@@ -131,54 +134,60 @@ def seed_rules(session, rules: List[Dict[str, Any]]) -> tuple[int, int, int]:
             errors += 1
             continue
 
+        # Use savepoint for each rule to isolate failures
         try:
-            # Check if rule already exists
-            result = session.execute(text("""
-                SELECT id, version FROM as1851_rules
-                WHERE rule_code = :code
-            """), {"code": rule["rule_code"]})
+            with session.begin_nested():
+                # Check if rule already exists
+                result = session.execute(text("""
+                    SELECT id, version FROM as1851_rules
+                    WHERE rule_code = :code
+                """), {"code": rule["rule_code"]})
 
-            existing = result.fetchone()
+                existing = result.fetchone()
 
-            if existing:
-                print(f"⏭️  Rule {rule['rule_code']} already exists (version: {existing[1]})")
-                skipped += 1
-                continue
+                if existing:
+                    print(f"⏭️  Rule {rule['rule_code']} already exists (version: {existing[1]})")
+                    skipped += 1
+                    continue
 
-            # Insert new rule
-            session.execute(text("""
-                INSERT INTO as1851_rules (
-                    rule_code, version, rule_name, description,
-                    rule_schema, is_active, created_at, updated_at
-                ) VALUES (
-                    :code, :version, :name, :desc,
-                    CAST(:schema AS jsonb), :active, :created, :updated
-                )
-            """), {
-                "code": rule["rule_code"],
-                "version": rule["version"],
-                "name": rule["rule_name"],
-                "desc": rule["description"],
-                "schema": json.dumps(rule["rule_schema"]),
-                "active": rule["is_active"],
-                "created": rule.get("created_at", datetime.utcnow().isoformat()),
-                "updated": datetime.utcnow().isoformat()
-            })
+                # Insert new rule with category and test_frequency
+                now = datetime.now(timezone.utc).isoformat()
+                session.execute(text("""
+                    INSERT INTO as1851_rules (
+                        rule_code, version, rule_name, description,
+                        category, test_frequency,
+                        rule_schema, is_active, created_at, updated_at
+                    ) VALUES (
+                        :code, :version, :name, :desc,
+                        :category, :frequency,
+                        CAST(:schema AS jsonb), :active, :created, :updated
+                    )
+                """), {
+                    "code": rule["rule_code"],
+                    "version": rule["version"],
+                    "name": rule["rule_name"],
+                    "desc": rule["description"],
+                    "category": rule.get("category", "unknown"),
+                    "frequency": rule.get("test_frequency", "unknown"),
+                    "schema": json.dumps(rule["rule_schema"]),
+                    "active": rule["is_active"],
+                    "created": rule.get("created_at", now),
+                    "updated": now
+                })
 
-            print(f"✅ Seeded: {rule['rule_code']} - {rule['rule_name']}")
-            inserted += 1
+                print(f"✅ Seeded: {rule['rule_code']} - {rule['rule_name']}")
+                inserted += 1
 
         except IntegrityError as e:
+            # Savepoint automatically rolled back, session remains valid
             print(f"❌ Integrity error for {rule['rule_code']}: {e}")
-            session.rollback()
             errors += 1
-            continue
         except Exception as e:
+            # Savepoint automatically rolled back, session remains valid
             print(f"❌ Error seeding {rule['rule_code']}: {e}")
-            session.rollback()
             errors += 1
-            continue
 
+    # Commit all successful inserts
     session.commit()
     return inserted, skipped, errors
 
@@ -226,7 +235,7 @@ def print_summary(inserted: int, skipped: int, errors: int, rules: List[Dict[str
 def main():
     """Main seeding function"""
     print("🌱 Starting AS1851-2012 Rule Seeding...")
-    print(f"🕐 Timestamp: {datetime.utcnow().isoformat()}")
+    print(f"🕐 Timestamp: {datetime.now(timezone.utc).isoformat()}")
 
     try:
         # Load rules from JSON
