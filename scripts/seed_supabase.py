@@ -100,45 +100,48 @@ def main():
             conn.commit()
             print(f"✅ Table ready")
 
-            # Seed rules
+            # Seed rules using savepoints for transaction safety
             print(f"\n🌱 Seeding {len(rules)} rules...")
             inserted, skipped, errors = 0, 0, 0
 
             for rule in rules:
+                # Use savepoint for each rule to isolate failures
                 try:
-                    # Check if exists
-                    result = conn.execute(
-                        text("SELECT id FROM as1851_rules WHERE rule_code = :code"),
-                        {"code": rule["rule_code"]}
-                    )
-                    if result.fetchone():
-                        skipped += 1
-                        continue
+                    with conn.begin_nested():
+                        # Check if exists
+                        result = conn.execute(
+                            text("SELECT id FROM as1851_rules WHERE rule_code = :code"),
+                            {"code": rule["rule_code"]}
+                        )
+                        if result.fetchone():
+                            skipped += 1
+                            continue
 
-                    # Insert with category and test_frequency
-                    conn.execute(
-                        text("""
-                            INSERT INTO as1851_rules
-                            (rule_code, version, rule_name, description, category, test_frequency, rule_schema, is_active, created_at, updated_at)
-                            VALUES (:code, :version, :name, :desc, :category, :frequency, CAST(:schema AS jsonb), :active, :created, :updated)
-                        """),
-                        {
-                            "code": rule["rule_code"],
-                            "version": rule["version"],
-                            "name": rule["rule_name"],
-                            "desc": rule["description"],
-                            "category": rule.get("category", "unknown"),
-                            "frequency": rule.get("test_frequency", "unknown"),
-                            "schema": json.dumps(rule["rule_schema"]),
-                            "active": rule["is_active"],
-                            "created": rule["created_at"],
-                            "updated": rule["updated_at"]
-                        }
-                    )
-                    inserted += 1
-                    print(f"   ✅ {rule['rule_code']}")
+                        # Insert with category and test_frequency
+                        conn.execute(
+                            text("""
+                                INSERT INTO as1851_rules
+                                (rule_code, version, rule_name, description, category, test_frequency, rule_schema, is_active, created_at, updated_at)
+                                VALUES (:code, :version, :name, :desc, :category, :frequency, CAST(:schema AS jsonb), :active, :created, :updated)
+                            """),
+                            {
+                                "code": rule["rule_code"],
+                                "version": rule["version"],
+                                "name": rule["rule_name"],
+                                "desc": rule["description"],
+                                "category": rule.get("category", "unknown"),
+                                "frequency": rule.get("test_frequency", "unknown"),
+                                "schema": json.dumps(rule["rule_schema"]),
+                                "active": rule["is_active"],
+                                "created": rule["created_at"],
+                                "updated": rule["updated_at"]
+                            }
+                        )
+                        inserted += 1
+                        print(f"   ✅ {rule['rule_code']}")
 
                 except Exception as e:
+                    # Savepoint automatically rolled back, transaction remains valid
                     print(f"   ❌ {rule['rule_code']}: {e}")
                     errors += 1
 
