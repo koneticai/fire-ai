@@ -1,0 +1,2588 @@
+[
+  {
+    "rule_code": "AS1851-2012-FD-01",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Identity & Baseline Data",
+    "description": "Fire Door - Identity & Baseline Data. Required data: door_id, building_location, frl_rating (+3 more). per AS1851-2012 Table 12.4.3.1 Item 1.1.",
+    "category": "fire_doors",
+    "test_frequency": "baseline",
+    "rule_schema": {
+      "required_data": [
+        "door_id",
+        "building_location",
+        "frl_rating",
+        "proprietary_type",
+        "approved_design_ref",
+        "commissioning_cert"
+      ],
+      "classification_logic": {
+        "PASS": "All baseline data captured",
+        "FAIL": "Missing baseline data"
+      },
+      "_validation": {
+        "confidence": 1.0,
+        "section_reference": "Table 12.4.3.1 Item 1.1",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-02",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Hardware Specification (Baseline)",
+    "description": "Fire Door - Hardware Specification (Baseline). Required data: hinge_type, closer_type, latch_type (+2 more). per AS1851-2012 Table 12.4.3.1 Items 1.5-1.11.",
+    "category": "fire_doors",
+    "test_frequency": "baseline",
+    "rule_schema": {
+      "required_data": [
+        "hinge_type",
+        "closer_type",
+        "latch_type",
+        "seal_specification",
+        "glazing_type"
+      ],
+      "classification_logic": {
+        "PASS": "All hardware specifications documented",
+        "FAIL": "Missing hardware specifications"
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Table 12.4.3.1 Items 1.5-1.11",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-03",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Commissioning Certification",
+    "description": "Fire Door - Commissioning Certification. Required data: commissioning_report, test_results, compliance_verification (+1 more). per AS1851-2012 Section 12.2.",
+    "category": "fire_doors",
+    "test_frequency": "baseline",
+    "rule_schema": {
+      "required_data": [
+        "commissioning_report",
+        "test_results",
+        "compliance_verification",
+        "sign_off"
+      ],
+      "classification_logic": {
+        "PASS": "Valid commissioning certification",
+        "FAIL": "Missing or invalid certification"
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Section 12.2",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-04",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Six-Monthly Visual Damage Inspection",
+    "description": "Fire Door - Six-Monthly Visual Damage Inspection. Inspection: leaf_damage_free, frame_distortion_free, edge_condition_good (+1 more). per AS1851-2012 Table 12.4.3.1 Item 1.12.",
+    "category": "fire_doors",
+    "test_frequency": "six_monthly",
+    "rule_schema": {
+      "inspection_items": {
+        "leaf_damage_free": {
+          "type": "boolean"
+        },
+        "frame_distortion_free": {
+          "type": "boolean"
+        },
+        "edge_condition_good": {
+          "type": "boolean"
+        },
+        "threshold_intact": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL inspection_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY inspection_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Table 12.4.3.1 Item 1.12",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-05",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Six-Monthly Self-Closing Test",
+    "description": "Fire Door - Six-Monthly Self-Closing Test. Verification: closes_from_70_degrees, closes_from_15_degrees, latches_when_closed. per AS1851-2012 Table 12.4.3.1 Item 1.8.",
+    "category": "fire_doors",
+    "test_frequency": "six_monthly",
+    "rule_schema": {
+      "test_results": {
+        "closes_from_70_degrees": {
+          "type": "boolean"
+        },
+        "closes_from_15_degrees": {
+          "type": "boolean"
+        },
+        "latches_when_closed": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL test_results == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY test_results == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 1.0,
+        "section_reference": "Table 12.4.3.1 Item 1.8",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-06",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Six-Monthly Latch Engagement Test",
+    "description": "Fire Door - Six-Monthly Latch Engagement Test. Verification: latch_engages_positively, bolt_extends_fully, no_binding. per AS1851-2012 Table 12.4.3.1 Item 1.9.",
+    "category": "fire_doors",
+    "test_frequency": "six_monthly",
+    "rule_schema": {
+      "test_results": {
+        "latch_engages_positively": {
+          "type": "boolean"
+        },
+        "bolt_extends_fully": {
+          "type": "boolean"
+        },
+        "no_binding": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL test_results == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY test_results == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 1.0,
+        "section_reference": "Table 12.4.3.1 Item 1.9",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-07",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Six-Monthly Seals Condition",
+    "description": "Fire Door - Six-Monthly Seals Condition. Inspection: intumescent_seals_present, smoke_seals_continuous, bottom_seal_adequate (+1 more). per AS1851-2012 Table 12.4.3.1 Item 1.7.",
+    "category": "fire_doors",
+    "test_frequency": "six_monthly",
+    "rule_schema": {
+      "inspection_items": {
+        "intumescent_seals_present": {
+          "type": "boolean"
+        },
+        "smoke_seals_continuous": {
+          "type": "boolean"
+        },
+        "bottom_seal_adequate": {
+          "type": "boolean"
+        },
+        "no_gaps_in_coverage": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL inspection_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY inspection_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Table 12.4.3.1 Item 1.7",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-08",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Six-Monthly Closer Operation",
+    "description": "Fire Door - Six-Monthly Closer Operation. Inspection: closer_free_from_obstruction, full_swing_operation, no_fluid_leakage (+1 more). per AS1851-2012 Table 12.4.3.1 Item 1.10.",
+    "category": "fire_doors",
+    "test_frequency": "six_monthly",
+    "rule_schema": {
+      "inspection_items": {
+        "closer_free_from_obstruction": {
+          "type": "boolean"
+        },
+        "full_swing_operation": {
+          "type": "boolean"
+        },
+        "no_fluid_leakage": {
+          "type": "boolean"
+        },
+        "mounting_secure": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL inspection_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY inspection_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Table 12.4.3.1 Item 1.10",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-09",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Six-Monthly Hinge Condition",
+    "description": "Fire Door - Six-Monthly Hinge Condition. Inspection: hinges_wear_free, hinges_aligned, smooth_operation (+1 more). per AS1851-2012 Table 12.4.3.1 Item 1.11.",
+    "category": "fire_doors",
+    "test_frequency": "six_monthly",
+    "rule_schema": {
+      "inspection_items": {
+        "hinges_wear_free": {
+          "type": "boolean"
+        },
+        "hinges_aligned": {
+          "type": "boolean"
+        },
+        "smooth_operation": {
+          "type": "boolean"
+        },
+        "securely_fastened": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL inspection_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY inspection_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Table 12.4.3.1 Item 1.11",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-10",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Six-Monthly Gap & Clearance Measurements",
+    "description": "Fire Door - Six-Monthly Gap & Clearance Measurements. per AS1851-2012 Table 12.4.3.1 Item 1.4.",
+    "category": "fire_doors",
+    "test_frequency": "six_monthly",
+    "rule_schema": {
+      "measurements": {
+        "perimeter_gap_mm": {
+          "type": "number"
+        },
+        "bottom_gap_mm": {
+          "type": "number"
+        },
+        "meeting_stile_gap_mm": {
+          "type": "number",
+          "optional": true
+        }
+      },
+      "thresholds": {
+        "typical_max_perimeter_mm": 3,
+        "per_manufacturer_spec": true
+      },
+      "classification_logic": {
+        "PASS": "All gaps within manufacturer specifications",
+        "FAIL": "Gaps exceed specifications"
+      },
+      "_validation": {
+        "confidence": 1.0,
+        "section_reference": "Table 12.4.3.1 Item 1.4",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-11",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Six-Monthly Hardware Security",
+    "description": "Fire Door - Six-Monthly Hardware Security. Inspection: hardware_securely_attached, correct_fittings_per_as1905, no_non_approved_attachments (+1 more). per AS1851-2012 Table 12.4.3.1 Item 1.6.",
+    "category": "fire_doors",
+    "test_frequency": "six_monthly",
+    "rule_schema": {
+      "inspection_items": {
+        "hardware_securely_attached": {
+          "type": "boolean"
+        },
+        "correct_fittings_per_as1905": {
+          "type": "boolean"
+        },
+        "no_non_approved_attachments": {
+          "type": "boolean"
+        },
+        "kick_plates_secure": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL inspection_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY inspection_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.9,
+        "section_reference": "Table 12.4.3.1 Item 1.6",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-12",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Six-Monthly Marking & Signage",
+    "description": "Fire Door - Six-Monthly Marking & Signage. Inspection: door_tags_present, statutory_signage_present, frl_identification_visible (+1 more). per AS1851-2012 Table 12.4.3.1 Item 1.3.",
+    "category": "fire_doors",
+    "test_frequency": "six_monthly",
+    "rule_schema": {
+      "inspection_items": {
+        "door_tags_present": {
+          "type": "boolean"
+        },
+        "statutory_signage_present": {
+          "type": "boolean"
+        },
+        "frl_identification_visible": {
+          "type": "boolean"
+        },
+        "manufacturer_id_visible": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL inspection_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY inspection_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.9,
+        "section_reference": "Table 12.4.3.1 Item 1.3",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-13",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Six-Monthly Fire Rating Verification",
+    "description": "Fire Door - Six-Monthly Fire Rating Verification. per AS1851-2012 Table 12.4.3.1 Item 1.2.",
+    "category": "fire_doors",
+    "test_frequency": "six_monthly",
+    "rule_schema": {
+      "verification_items": {
+        "frl_matches_design": {
+          "type": "boolean"
+        },
+        "frame_stop_dimensions_correct": {
+          "type": "boolean"
+        },
+        "no_modifications_affecting_frl": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL verification_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY verification_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Table 12.4.3.1 Item 1.2",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-14",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Six-Monthly Frame Integrity",
+    "description": "Fire Door - Six-Monthly Frame Integrity. Inspection: frame_distortion_free, adequately_anchored, striker_plate_present (+1 more). per AS1851-2012 Table 12.4.3.1 Items 1.13-1.14.",
+    "category": "fire_doors",
+    "test_frequency": "six_monthly",
+    "rule_schema": {
+      "inspection_items": {
+        "frame_distortion_free": {
+          "type": "boolean"
+        },
+        "adequately_anchored": {
+          "type": "boolean"
+        },
+        "striker_plate_present": {
+          "type": "boolean"
+        },
+        "backfill_verified": {
+          "type": "boolean",
+          "if_steel_frame": true
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL inspection_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY inspection_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.9,
+        "section_reference": "Table 12.4.3.1 Items 1.13-1.14",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-15",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Annual Opening Force Test",
+    "description": "Fire Door - Annual Opening Force Test. Test inputs: door_id, pressurization_condition. per AS1851-2012 Table 12.4.3.1 Item 1.5a.",
+    "category": "fire_doors",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "test_inputs": [
+        "door_id",
+        "pressurization_condition"
+      ],
+      "test_results": {
+        "opening_force_n": {
+          "type": "number",
+          "min": 0,
+          "max": 200
+        }
+      },
+      "thresholds": {
+        "maximum_force_n": 110
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "opening_force_n <= 110"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "opening_force_n > 110"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 1.0,
+        "section_reference": "Table 12.4.3.1 Item 1.5a",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-16",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Annual Paint & Coating Integrity",
+    "description": "Fire Door - Annual Paint & Coating Integrity. Inspection: intumescent_coating_intact, no_flaking_damage, touch_up_applied. per AS1851-2012 Table 12.4.3.1 Item 1.12.",
+    "category": "fire_doors",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "inspection_items": {
+        "intumescent_coating_intact": {
+          "type": "boolean"
+        },
+        "no_flaking_damage": {
+          "type": "boolean"
+        },
+        "touch_up_applied": {
+          "type": "boolean",
+          "if_required": true
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL inspection_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY inspection_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.85,
+        "section_reference": "Table 12.4.3.1 Item 1.12",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-17",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Annual Vision Panel Inspection",
+    "description": "Fire Door - Annual Vision Panel Inspection. Inspection: glazing_approved, glass_sound, perimeter_trim_secure (+2 more). per AS1851-2012 Table 12.4.3.1 Item 1.15.",
+    "category": "fire_doors",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "inspection_items": {
+        "glazing_approved": {
+          "type": "boolean"
+        },
+        "glass_sound": {
+          "type": "boolean"
+        },
+        "perimeter_trim_secure": {
+          "type": "boolean"
+        },
+        "fixings_in_place": {
+          "type": "boolean"
+        },
+        "fire_rating_id_visible": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL inspection_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY inspection_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.9,
+        "section_reference": "Table 12.4.3.1 Item 1.15",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-18",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Annual Full Operation Test",
+    "description": "Fire Door - Annual Full Operation Test. Verification: complete_cycle_smooth, no_binding_jamming, self_closing_verified (+1 more). per AS1851-2012 Section 12.3.",
+    "category": "fire_doors",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "test_results": {
+        "complete_cycle_smooth": {
+          "type": "boolean"
+        },
+        "no_binding_jamming": {
+          "type": "boolean"
+        },
+        "self_closing_verified": {
+          "type": "boolean"
+        },
+        "latch_engagement_verified": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL test_results == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY test_results == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.9,
+        "section_reference": "Section 12.3",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-19",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Annual Condition Report",
+    "description": "Fire Door - Annual Condition Report. per AS1851-2012 Section 12.3.",
+    "category": "fire_doors",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "report_contents": [
+        "test_summary",
+        "baseline_comparison",
+        "defect_log",
+        "recommendations",
+        "compliance_statement"
+      ],
+      "classification_logic": {
+        "PASS": "Complete report with all sections",
+        "FAIL": "Incomplete report"
+      },
+      "_validation": {
+        "confidence": 0.85,
+        "section_reference": "Section 12.3",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-FD-20",
+    "version": "1.0.0",
+    "rule_name": "Fire Door - Defect Event Management",
+    "description": "Fire Door - Defect Event Management. per AS1851-2012 Section 2.4.",
+    "category": "fire_doors",
+    "test_frequency": "ad_hoc",
+    "rule_schema": {
+      "defect_management": {
+        "identification": {
+          "type": "boolean"
+        },
+        "risk_assessment": {
+          "type": "string",
+          "enum": [
+            "critical",
+            "non_critical"
+          ]
+        },
+        "notification_24h": {
+          "type": "boolean",
+          "required_if": "critical"
+        },
+        "remediation_tracked": {
+          "type": "boolean"
+        },
+        "post_repair_verification": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": "Defect properly managed",
+        "FAIL": "Defect management incomplete"
+      },
+      "_validation": {
+        "confidence": 0.9,
+        "section_reference": "Section 2.4",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-01",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - System Identity & Baseline Data",
+    "description": "System Identity & Baseline Data. Required data: building_id, system_type, zone_coverage (+3 more). per AS1851-2012 Section 13.1.2.",
+    "category": "smoke_control",
+    "test_frequency": "baseline",
+    "rule_schema": {
+      "required_data": [
+        "building_id",
+        "system_type",
+        "zone_coverage",
+        "design_documentation",
+        "commissioning_cert",
+        "control_panel_locations"
+      ],
+      "classification_logic": {
+        "PASS": "All baseline data captured",
+        "FAIL": "Missing baseline data"
+      },
+      "_validation": {
+        "confidence": 1.0,
+        "section_reference": "Section 13.1.2",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-02",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - Equipment Specification (Baseline)",
+    "description": "Equipment Specification (Baseline). Required data: exhaust_fans, dampers, automatic_vents (+2 more). per AS1851-2012 Section 13.2.",
+    "category": "smoke_control",
+    "test_frequency": "baseline",
+    "rule_schema": {
+      "required_data": [
+        "exhaust_fans",
+        "dampers",
+        "automatic_vents",
+        "control_systems",
+        "relief_openings"
+      ],
+      "classification_logic": {
+        "PASS": "All equipment specifications documented",
+        "FAIL": "Missing equipment specifications"
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Section 13.2",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-03",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - Commissioning Certification",
+    "description": "Commissioning Certification. Required data: commissioning_report, performance_verification, as_built_documentation (+1 more). per AS1851-2012 Section 13.1.3.",
+    "category": "smoke_control",
+    "test_frequency": "baseline",
+    "rule_schema": {
+      "required_data": [
+        "commissioning_report",
+        "performance_verification",
+        "as_built_documentation",
+        "sign_off"
+      ],
+      "classification_logic": {
+        "PASS": "Valid commissioning certification",
+        "FAIL": "Missing or invalid certification"
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Section 13.1.3",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-04",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - Monthly Kitchen Exhaust Check",
+    "description": "Monthly Kitchen Exhaust Check. Inspection: filter_accumulation_checked, hood_grease_checked, gutter_accumulation_checked (+2 more). per AS1851-2012 Table 13.4.1.16 Items 15.1-15.5.",
+    "category": "smoke_control",
+    "test_frequency": "monthly",
+    "rule_schema": {
+      "inspection_items": {
+        "filter_accumulation_checked": {
+          "type": "boolean"
+        },
+        "hood_grease_checked": {
+          "type": "boolean"
+        },
+        "gutter_accumulation_checked": {
+          "type": "boolean"
+        },
+        "filter_security_checked": {
+          "type": "boolean"
+        },
+        "filter_cleaned_if_required": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL inspection_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY inspection_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.9,
+        "section_reference": "Table 13.4.1.16 Items 15.1-15.5",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-05",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - Monthly Outdoor Intakes Check",
+    "description": "Monthly Outdoor Intakes Check. Inspection: combustible_material_removed. per AS1851-2012 Table 13.4.1.18 Item 17.1.",
+    "category": "smoke_control",
+    "test_frequency": "monthly",
+    "rule_schema": {
+      "inspection_items": {
+        "combustible_material_removed": {
+          "type": "boolean"
+        }
+      },
+      "notes": "Can be performed by non-technical personnel",
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "combustible_material_removed == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "combustible_material_removed == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.9,
+        "section_reference": "Table 13.4.1.18 Item 17.1",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-06",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - Three-Monthly Fan Service",
+    "description": "Three-Monthly Fan Service. Inspection: obstructions_clear, noise_normal, overheating_absent (+5 more). per AS1851-2012 Table 13.4.1.2 Items 1.1-1.7.",
+    "category": "smoke_control",
+    "test_frequency": "three_monthly",
+    "rule_schema": {
+      "inspection_items": {
+        "obstructions_clear": {
+          "type": "boolean"
+        },
+        "noise_normal": {
+          "type": "boolean"
+        },
+        "overheating_absent": {
+          "type": "boolean"
+        },
+        "vibration_normal": {
+          "type": "boolean"
+        },
+        "flexible_connections_intact": {
+          "type": "boolean"
+        },
+        "belt_tension_adequate": {
+          "type": "boolean"
+        },
+        "guards_secure": {
+          "type": "boolean"
+        },
+        "bearings_lubricated": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL inspection_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY inspection_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Table 13.4.1.2 Items 1.1-1.7",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-07",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - Three-Monthly FIP Simulation",
+    "description": "Three-Monthly FIP Simulation. Verification: fans_operate_fire_mode, dampers_operate_fire_mode, auto_doors_operate (+3 more). per AS1851-2012 Table 13.4.2.6 Item 5.1.",
+    "category": "smoke_control",
+    "test_frequency": "three_monthly",
+    "rule_schema": {
+      "test_results": {
+        "fans_operate_fire_mode": {
+          "type": "boolean"
+        },
+        "dampers_operate_fire_mode": {
+          "type": "boolean"
+        },
+        "auto_doors_operate": {
+          "type": "boolean"
+        },
+        "indicators_correct": {
+          "type": "boolean"
+        },
+        "noise_acceptable": {
+          "type": "boolean"
+        },
+        "air_movement_correct": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL test_results == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY test_results == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 1.0,
+        "section_reference": "Table 13.4.2.6 Item 5.1",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-08",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - Three-Monthly System Changeover",
+    "description": "Three-Monthly System Changeover. Verification: changeover_operates, fans_per_documentation, dampers_per_documentation (+1 more). per AS1851-2012 Table 13.4.2.4 Item 3.1.",
+    "category": "smoke_control",
+    "test_frequency": "three_monthly",
+    "rule_schema": {
+      "test_results": {
+        "changeover_operates": {
+          "type": "boolean"
+        },
+        "fans_per_documentation": {
+          "type": "boolean"
+        },
+        "dampers_per_documentation": {
+          "type": "boolean"
+        },
+        "indicators_change_status": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL test_results == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY test_results == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Table 13.4.2.4 Item 3.1",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-09",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - Six-Monthly Air Control Dampers",
+    "description": "Six-Monthly Air Control Dampers. Verification: operates_fully_open, operates_fully_closed, clear_of_obstructions. per AS1851-2012 Tables 13.4.1.5, 13.4.1.7.",
+    "category": "smoke_control",
+    "test_frequency": "six_monthly",
+    "rule_schema": {
+      "damper_types": [
+        "recycle_air",
+        "relief_air",
+        "smoke_spill",
+        "outdoor_air",
+        "supply",
+        "return",
+        "exhaust"
+      ],
+      "test_results": {
+        "operates_fully_open": {
+          "type": "boolean"
+        },
+        "operates_fully_closed": {
+          "type": "boolean"
+        },
+        "clear_of_obstructions": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL test_results == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY test_results == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Tables 13.4.1.5, 13.4.1.7",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-10",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - Six-Monthly Automatic Vents",
+    "description": "Six-Monthly Automatic Vents. Inspection: control_panel_undamaged, power_supply_verified, air_filter_maintained (+4 more). per AS1851-2012 Table 13.4.1.9 Items 8.1-8.7.",
+    "category": "smoke_control",
+    "test_frequency": "six_monthly",
+    "rule_schema": {
+      "inspection_items": {
+        "control_panel_undamaged": {
+          "type": "boolean"
+        },
+        "power_supply_verified": {
+          "type": "boolean"
+        },
+        "air_filter_maintained": {
+          "type": "boolean"
+        },
+        "system_pressure_correct": {
+          "type": "boolean"
+        },
+        "battery_backup_verified": {
+          "type": "boolean"
+        },
+        "battery_operates_on_mains_failure": {
+          "type": "boolean"
+        },
+        "obstructions_cleared": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL inspection_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY inspection_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.9,
+        "section_reference": "Table 13.4.1.9 Items 8.1-8.7",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-11",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - Six-Monthly Fire/Smoke Curtains",
+    "description": "Six-Monthly Fire/Smoke Curtains. Inspection: obstructions_checked, manual_deployment_tested, fabric_undamaged (+2 more). per AS1851-2012 Table 13.4.1.11 Items 10.1-10.5.",
+    "category": "smoke_control",
+    "test_frequency": "six_monthly",
+    "rule_schema": {
+      "inspection_items": {
+        "obstructions_checked": {
+          "type": "boolean"
+        },
+        "manual_deployment_tested": {
+          "type": "boolean"
+        },
+        "fabric_undamaged": {
+          "type": "boolean"
+        },
+        "guide_track_aligned": {
+          "type": "boolean"
+        },
+        "psu_tests_passed": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL inspection_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY inspection_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.9,
+        "section_reference": "Table 13.4.1.11 Items 10.1-10.5",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-12",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - Six-Monthly Motorized Relief Openings",
+    "description": "Six-Monthly Motorized Relief Openings. Inspection: visual_inspection_passed, power_supply_verified, pneumatic_filter_maintained (+4 more). per AS1851-2012 Table 13.4.1.13 Items 12.1-12.9.",
+    "category": "smoke_control",
+    "test_frequency": "six_monthly",
+    "rule_schema": {
+      "inspection_items": {
+        "visual_inspection_passed": {
+          "type": "boolean"
+        },
+        "power_supply_verified": {
+          "type": "boolean"
+        },
+        "pneumatic_filter_maintained": {
+          "type": "boolean"
+        },
+        "system_pressure_correct": {
+          "type": "boolean"
+        },
+        "battery_backup_verified": {
+          "type": "boolean"
+        },
+        "vent_condition_good": {
+          "type": "boolean"
+        },
+        "manual_switch_tested": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL inspection_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY inspection_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.9,
+        "section_reference": "Table 13.4.1.13 Items 12.1-12.9",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-13",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - Annual Fan Service",
+    "description": "Annual Fan Service. per AS1851-2012 Table 13.4.1.3 Items 2.1-2.4.",
+    "category": "smoke_control",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "service_items": {
+        "three_monthly_completed": {
+          "type": "boolean"
+        },
+        "pulley_alignment_checked": {
+          "type": "boolean"
+        },
+        "casing_corrosion_checked": {
+          "type": "boolean"
+        },
+        "electrical_connections_checked": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL service_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY service_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Table 13.4.1.3 Items 2.1-2.4",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-14",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - Annual Fire/Smoke Dampers (20% Sampling)",
+    "description": "Annual Fire/Smoke Dampers (20% Sampling). Inspection: obstruction_free, operation_verified, fusible_link_intact (+5 more). per AS1851-2012 Table 13.4.1.4 Items 3.1-3.13.",
+    "category": "smoke_control",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "sampling_configuration": {
+        "sample_percent": 20,
+        "cycle_years": 5,
+        "failure_escalation_threshold_percent": 10,
+        "escalation_action": "inspect_all_within_12_months"
+      },
+      "inspection_items": {
+        "obstruction_free": {
+          "type": "boolean"
+        },
+        "operation_verified": {
+          "type": "boolean"
+        },
+        "fusible_link_intact": {
+          "type": "boolean"
+        },
+        "corrosion_acceptable": {
+          "type": "boolean"
+        },
+        "tampering_absent": {
+          "type": "boolean"
+        },
+        "fire_construction_intact": {
+          "type": "boolean"
+        },
+        "tip_seal_condition": {
+          "type": "boolean",
+          "smoke_dampers_only": true
+        },
+        "fail_safe_tested": {
+          "type": "boolean",
+          "smoke_dampers_only": true
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "sample_size >= 20%",
+            "failure_rate <= 10%"
+          ]
+        },
+        "ESCALATE": {
+          "conditions": [
+            "failure_rate > 10%"
+          ],
+          "action": "schedule_100%_inspection"
+        }
+      },
+      "_validation": {
+        "confidence": 1.0,
+        "section_reference": "Table 13.4.1.4 Items 3.1-3.13",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-15",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - Annual Detector Simulation",
+    "description": "Annual Detector Simulation. Test inputs: detector_type, detector_location. per AS1851-2012 Table 13.4.2.7 Item 6.2.",
+    "category": "smoke_control",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "test_inputs": [
+        "detector_type",
+        "detector_location"
+      ],
+      "test_results": {
+        "exhaust_airflow_verified": {
+          "type": "boolean"
+        },
+        "indicator_status_changes": {
+          "type": "boolean"
+        },
+        "manual_switch_operates": {
+          "type": "boolean"
+        },
+        "noise_level_acceptable": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL test_results == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY test_results == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 1.0,
+        "section_reference": "Table 13.4.2.7 Item 6.2",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-16",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - Annual Fire/Smoke Curtains",
+    "description": "Annual Fire/Smoke Curtains. per AS1851-2012 Table 13.4.1.12 Items 11.1-11.14.",
+    "category": "smoke_control",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "service_items": {
+        "six_monthly_completed": {
+          "type": "boolean"
+        },
+        "top_bottom_limits_verified": {
+          "type": "boolean"
+        },
+        "ascent_descent_speed_recorded": {
+          "type": "boolean"
+        },
+        "auto_deployment_tested": {
+          "type": "boolean"
+        },
+        "fail_safe_tested": {
+          "type": "boolean"
+        },
+        "battery_replaced_if_over_2_years": {
+          "type": "boolean"
+        },
+        "mcc_electrical_tests_passed": {
+          "type": "boolean"
+        },
+        "warning_systems_verified": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL service_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY service_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.9,
+        "section_reference": "Table 13.4.1.12 Items 11.1-11.14",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-17",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - Annual Design Survey",
+    "description": "Annual Design Survey. per AS1851-2012 Table 13.4.3.2 Item 1.1.",
+    "category": "smoke_control",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "survey_items": {
+        "physical_impediments_checked": {
+          "type": "boolean"
+        },
+        "building_alterations_assessed": {
+          "type": "boolean"
+        },
+        "obstructions_identified": {
+          "type": "boolean"
+        },
+        "original_design_compared": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL survey_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY survey_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.9,
+        "section_reference": "Table 13.4.3.2 Item 1.1",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-18",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - Annual Condition Report",
+    "description": "Annual Condition Report. per AS1851-2012 Section 13.3.",
+    "category": "smoke_control",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "report_contents": [
+        "service_summary",
+        "test_results",
+        "defect_log",
+        "compliance_statement",
+        "recommendations"
+      ],
+      "classification_logic": {
+        "PASS": "Complete report with all sections",
+        "FAIL": "Incomplete report"
+      },
+      "_validation": {
+        "confidence": 0.85,
+        "section_reference": "Section 13.3",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-19",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - Five-Year Design Survey",
+    "description": "Five-Year Design Survey. per AS1851-2012 Table 13.4.3.2.",
+    "category": "smoke_control",
+    "test_frequency": "five_yearly",
+    "rule_schema": {
+      "survey_items": {
+        "all_yearly_items_completed": {
+          "type": "boolean"
+        },
+        "full_performance_review": {
+          "type": "boolean"
+        },
+        "commissioning_comparison": {
+          "type": "boolean"
+        },
+        "building_modifications_assessed": {
+          "type": "boolean"
+        },
+        "smoke_reservoir_integrity": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL survey_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY survey_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Table 13.4.3.2",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SC-20",
+    "version": "1.0.0",
+    "rule_name": "Smoke Control - 25-Year Fusible Link Replacement",
+    "description": "25-Year Fusible Link Replacement. per AS1851-2012 Items 3.7, 9.14, 11.14, 13.7.",
+    "category": "smoke_control",
+    "test_frequency": "25_yearly",
+    "rule_schema": {
+      "applicable_components": [
+        "fire_dampers",
+        "smoke_dampers",
+        "automatic_vents",
+        "fire_smoke_curtains",
+        "motorized_relief_openings"
+      ],
+      "replacement_requirements": {
+        "all_fusible_links_replaced": {
+          "type": "boolean"
+        },
+        "replacement_date_recorded": {
+          "type": "date"
+        },
+        "manufacture_date_verified": {
+          "type": "boolean"
+        }
+      },
+      "post_replacement": {
+        "sample_testing_percent": 20,
+        "cycle_years": 5
+      },
+      "classification_logic": {
+        "PASS": "All fusible links replaced within 25 years",
+        "FAIL": "Fusible links exceed 25-year limit"
+      },
+      "_validation": {
+        "confidence": 1.0,
+        "section_reference": "Items 3.7, 9.14, 11.14, 13.7",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-01",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - System Identity & Baseline Data",
+    "description": "System Identity & Baseline Data. Required data: building_id, system_id, zone_coverage (+2 more). per AS1851-2012 Section 13.1.2, Table 13.4.2.1.",
+    "category": "stair_pressurization",
+    "test_frequency": "baseline",
+    "rule_schema": {
+      "required_data": [
+        "building_id",
+        "system_id",
+        "zone_coverage",
+        "design_documentation",
+        "commissioning_certification"
+      ],
+      "classification_logic": {
+        "PASS": "All baseline data captured and verified",
+        "FAIL": "Missing required baseline data"
+      },
+      "_validation": {
+        "confidence": 1.0,
+        "section_reference": "Section 13.1.2, Table 13.4.2.1",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-02",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - Hardware Specification",
+    "description": "Hardware Specification. Required data: fan_specifications, damper_specifications, control_panel_details (+1 more). per AS1851-2012 Section 13.2, Table 13.4.1.2.",
+    "category": "stair_pressurization",
+    "test_frequency": "baseline",
+    "rule_schema": {
+      "required_data": [
+        "fan_specifications",
+        "damper_specifications",
+        "control_panel_details",
+        "relief_system_details"
+      ],
+      "classification_logic": {
+        "PASS": "All hardware specifications documented",
+        "FAIL": "Missing hardware specifications"
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Section 13.2, Table 13.4.1.2",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-03",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - Commissioning Certification",
+    "description": "Commissioning Certification. Required data: commissioning_report, test_results, compliance_verification (+1 more). per AS1851-2012 Section 13.1.3.",
+    "category": "stair_pressurization",
+    "test_frequency": "baseline",
+    "rule_schema": {
+      "required_data": [
+        "commissioning_report",
+        "test_results",
+        "compliance_verification",
+        "sign_off"
+      ],
+      "classification_logic": {
+        "PASS": "Valid commissioning certification present",
+        "FAIL": "Missing or invalid commissioning certification"
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Section 13.1.3",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-04",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - Three-Monthly FIP Simulation",
+    "description": "Three-Monthly FIP Simulation. Test inputs: fip_activation, test_date, tester_id. per AS1851-2012 Table 13.4.2.2 Item 1.1.",
+    "category": "stair_pressurization",
+    "test_frequency": "three_monthly",
+    "rule_schema": {
+      "test_inputs": [
+        "fip_activation",
+        "test_date",
+        "tester_id"
+      ],
+      "test_results": {
+        "fans_operate": {
+          "type": "boolean"
+        },
+        "dampers_operate": {
+          "type": "boolean"
+        },
+        "indicators_correct": {
+          "type": "boolean"
+        },
+        "noise_acceptable": {
+          "type": "boolean"
+        },
+        "door_ease_acceptable": {
+          "type": "boolean"
+        },
+        "air_movement_correct": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL test_results == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY test_results == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 1.0,
+        "section_reference": "Table 13.4.2.2 Item 1.1",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-05",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - Three-Monthly Fan Motor Service",
+    "description": "Three-Monthly Fan Motor Service. Inspection: obstructions_clear, noise_normal, overheating_absent (+5 more). per AS1851-2012 Table 13.4.1.2 Items 1.1-1.7.",
+    "category": "stair_pressurization",
+    "test_frequency": "three_monthly",
+    "rule_schema": {
+      "inspection_items": {
+        "obstructions_clear": {
+          "type": "boolean"
+        },
+        "noise_normal": {
+          "type": "boolean"
+        },
+        "overheating_absent": {
+          "type": "boolean"
+        },
+        "vibration_normal": {
+          "type": "boolean"
+        },
+        "flexible_connections_intact": {
+          "type": "boolean"
+        },
+        "belt_tension_adequate": {
+          "type": "boolean"
+        },
+        "guards_secure": {
+          "type": "boolean"
+        },
+        "bearings_lubricated": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL inspection_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY inspection_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Table 13.4.1.2 Items 1.1-1.7",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-06",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - Damper Operation Check",
+    "description": "Damper Operation Check. Verification: damper_operates_fully_open, damper_operates_fully_closed, clear_of_obstructions. per AS1851-2012 Table 13.4.1.5 Item 4.1.",
+    "category": "stair_pressurization",
+    "test_frequency": "three_monthly",
+    "rule_schema": {
+      "test_results": {
+        "damper_operates_fully_open": {
+          "type": "boolean"
+        },
+        "damper_operates_fully_closed": {
+          "type": "boolean"
+        },
+        "clear_of_obstructions": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL test_results == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY test_results == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.9,
+        "section_reference": "Table 13.4.1.5 Item 4.1",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)",
+        "issue_note": "Frequency mismatch - rule specifies monthly, standard specifies three-monthly/six-monthly"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-07",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - Indicator Lamp Check",
+    "description": "Indicator Lamp Check. Verification: all_indicators_functional, status_correct. per AS1851-2012 Table 13.4.2.2 Item 1.1.",
+    "category": "stair_pressurization",
+    "test_frequency": "three_monthly",
+    "rule_schema": {
+      "test_results": {
+        "all_indicators_functional": {
+          "type": "boolean"
+        },
+        "status_correct": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL test_results == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY test_results == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.9,
+        "section_reference": "Table 13.4.2.2 Item 1.1",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)",
+        "issue_note": "Frequency mismatch - rule specifies monthly, standard ties to three-monthly FIP simulation"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-08",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - Annual Detector Simulation",
+    "description": "Annual Detector Simulation. Test inputs: detector_type, detector_location, test_date. per AS1851-2012 Table 13.4.2.3 Item 2.2.",
+    "category": "stair_pressurization",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "test_inputs": [
+        "detector_type",
+        "detector_location",
+        "test_date"
+      ],
+      "test_results": {
+        "system_activates": {
+          "type": "boolean"
+        },
+        "fans_operate_fire_mode": {
+          "type": "boolean"
+        },
+        "dampers_operate_fire_mode": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL test_results == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY test_results == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 1.0,
+        "section_reference": "Table 13.4.2.3 Item 2.2",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-09",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - Annual Air Velocity Measurement",
+    "description": "Annual Air Velocity Measurement. Test inputs: doorway_id, measurement_location. per AS1851-2012 Table 13.4.2.3 Item 2.2.",
+    "category": "stair_pressurization",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "test_inputs": [
+        "doorway_id",
+        "measurement_location"
+      ],
+      "test_results": {
+        "air_velocity_ms": {
+          "type": "number",
+          "min": 0,
+          "max": 10
+        }
+      },
+      "thresholds": {
+        "minimum_velocity_ms": 1.0
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL air_velocity_ms >= 1.0"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY air_velocity_ms < 1.0"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 1.0,
+        "section_reference": "Table 13.4.2.3 Item 2.2",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-10",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - Annual Door Opening Force",
+    "description": "Annual Door Opening Force. Test inputs: door_id, measurement_location. per AS1851-2012 Table 13.4.2.3 Item 2.2.",
+    "category": "stair_pressurization",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "test_inputs": [
+        "door_id",
+        "measurement_location"
+      ],
+      "test_results": {
+        "opening_force_n": {
+          "type": "number",
+          "min": 0,
+          "max": 200
+        }
+      },
+      "thresholds": {
+        "maximum_force_n": 110
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL opening_force_n <= 110"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY opening_force_n > 110"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 1.0,
+        "section_reference": "Table 13.4.2.3 Item 2.2",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-11",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - Annual Noise Level Assessment",
+    "description": "Annual Noise Level Assessment. Test inputs: location_type, measurement_point. per AS1851-2012 Table 13.4.2.3 Item 2.2.",
+    "category": "stair_pressurization",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "test_inputs": [
+        "location_type",
+        "measurement_point"
+      ],
+      "test_results": {
+        "noise_level_acceptable": {
+          "type": "boolean"
+        },
+        "noise_level_db": {
+          "type": "number",
+          "optional": true
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "noise_level_acceptable == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "noise_level_acceptable == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Table 13.4.2.3 Item 2.2",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-12",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - Annual Door Recovery Time",
+    "description": "Annual Door Recovery Time. Test inputs: door_id, successive_openings_count. per AS1851-2012 Table 13.4.2.3 Item 2.2.",
+    "category": "stair_pressurization",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "test_inputs": [
+        "door_id",
+        "successive_openings_count"
+      ],
+      "test_results": {
+        "recovery_time_seconds": {
+          "type": "number"
+        },
+        "recovery_acceptable": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "recovery_acceptable == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "recovery_acceptable == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Table 13.4.2.3 Item 2.2",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-13",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - Annual Pressure Differential Test",
+    "description": "Annual Pressure Differential Test. Test inputs: floor_id, measurement_location. per AS1851-2012 Table 13.4.2.3 Item 2.2.",
+    "category": "stair_pressurization",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "test_inputs": [
+        "floor_id",
+        "measurement_location"
+      ],
+      "test_results": {
+        "floor_measurements": {
+          "type": "array",
+          "items": {
+            "floor_id": {
+              "type": "string"
+            },
+            "closed_door_pressure_pa": {
+              "type": "number",
+              "min": 0,
+              "max": 150
+            }
+          }
+        }
+      },
+      "thresholds": {
+        "minimum_pressure_pa": 20,
+        "maximum_pressure_pa": 80
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL closed_door_pressure_pa >= 20",
+            "ALL closed_door_pressure_pa <= 80"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY closed_door_pressure_pa < 20",
+            "ANY closed_door_pressure_pa > 80"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 1.0,
+        "section_reference": "Table 13.4.2.3 Item 2.2",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-14",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - Annual Supply Smoke Sensor Test",
+    "description": "Annual Supply Smoke Sensor Test. Verification: shutdown_activates, restart_functions. per AS1851-2012 Table 13.4.2.3 Item 2.2.",
+    "category": "stair_pressurization",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "test_results": {
+        "shutdown_activates": {
+          "type": "boolean"
+        },
+        "restart_functions": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "shutdown_activates == true",
+            "restart_functions == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "shutdown_activates == false",
+            "restart_functions == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Table 13.4.2.3 Item 2.2",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-15",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - Annual Fire Brigade Manual Controls",
+    "description": "Annual Fire Brigade Manual Controls. Verification: manual_switch_operates, switch_accessible. per AS1851-2012 Table 13.4.2.3 Item 2.2.",
+    "category": "stair_pressurization",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "test_results": {
+        "manual_switch_operates": {
+          "type": "boolean"
+        },
+        "switch_accessible": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL test_results == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY test_results == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 1.0,
+        "section_reference": "Table 13.4.2.3 Item 2.2",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-16",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - Annual Air Relief Operation",
+    "description": "Annual Air Relief Operation. Verification: relief_operates, simultaneous_operation_verified. per AS1851-2012 Table 13.4.2.3 Item 2.2.",
+    "category": "stair_pressurization",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "test_results": {
+        "relief_operates": {
+          "type": "boolean"
+        },
+        "simultaneous_operation_verified": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL test_results == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY test_results == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Table 13.4.2.3 Item 2.2",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-17",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - Annual Condition Report",
+    "description": "Annual Condition Report. per AS1851-2012 Section 13.3.",
+    "category": "stair_pressurization",
+    "test_frequency": "annual",
+    "rule_schema": {
+      "report_contents": [
+        "test_summary",
+        "baseline_comparison",
+        "defect_log",
+        "recommendations",
+        "compliance_statement"
+      ],
+      "classification_logic": {
+        "PASS": "Complete report generated with all required sections",
+        "FAIL": "Incomplete report or missing sections"
+      },
+      "_validation": {
+        "confidence": 0.9,
+        "section_reference": "Section 13.3",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-18",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - Defect Event Management",
+    "description": "Defect Event Management. per AS1851-2012 Section 2.4.",
+    "category": "stair_pressurization",
+    "test_frequency": "ad_hoc",
+    "rule_schema": {
+      "defect_management": {
+        "identification": {
+          "type": "boolean"
+        },
+        "risk_assessment": {
+          "type": "string",
+          "enum": [
+            "critical",
+            "non_critical"
+          ]
+        },
+        "notification_24h": {
+          "type": "boolean",
+          "required_if": "risk_assessment == critical"
+        },
+        "remediation_tracked": {
+          "type": "boolean"
+        },
+        "post_repair_verification": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": "Defect properly managed per procedures",
+        "FAIL": "Defect management incomplete"
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Section 2.4",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-19",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - Five-Year Design Survey",
+    "description": "Five-Year Design Survey. per AS1851-2012 Table 13.4.3.2 Item 1.1.",
+    "category": "stair_pressurization",
+    "test_frequency": "five_yearly",
+    "rule_schema": {
+      "survey_items": {
+        "physical_impediments_checked": {
+          "type": "boolean"
+        },
+        "alterations_assessed": {
+          "type": "boolean"
+        },
+        "original_design_compared": {
+          "type": "boolean"
+        }
+      },
+      "classification_logic": {
+        "PASS": {
+          "conditions": [
+            "ALL survey_items == true"
+          ]
+        },
+        "FAIL": {
+          "conditions": [
+            "ANY survey_items == false"
+          ]
+        }
+      },
+      "_validation": {
+        "confidence": 0.95,
+        "section_reference": "Table 13.4.3.2 Item 1.1",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  },
+  {
+    "rule_code": "AS1851-2012-SP-20",
+    "version": "1.0.0",
+    "rule_name": "Stair Pressurization - 25-Year Component Replacement",
+    "description": "25-Year Component Replacement. per AS1851-2012 Table 13.4.1.4 Item 3.7.",
+    "category": "stair_pressurization",
+    "test_frequency": "25_yearly",
+    "rule_schema": {
+      "replacement_requirements": {
+        "fusible_links_replaced": {
+          "type": "boolean"
+        },
+        "replacement_date_recorded": {
+          "type": "date"
+        },
+        "manufacture_date_verified": {
+          "type": "boolean"
+        }
+      },
+      "post_replacement": {
+        "sample_testing_percent": 20,
+        "cycle_years": 5
+      },
+      "classification_logic": {
+        "PASS": "All fusible links replaced within 25 years of manufacture",
+        "FAIL": "Fusible links exceed 25-year age limit"
+      },
+      "_validation": {
+        "confidence": 1.0,
+        "section_reference": "Table 13.4.1.4 Item 3.7",
+        "validated_date": "2026-02-04",
+        "standard_version": "AS1851-2012 Amendment No. 1 (November 2016)"
+      }
+    },
+    "is_active": true,
+    "created_at": "2026-02-04T03:47:00Z",
+    "updated_at": "2026-02-04T03:47:00Z"
+  }
+]
