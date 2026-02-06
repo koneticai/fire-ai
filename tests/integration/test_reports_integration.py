@@ -15,8 +15,8 @@ from src.app.database.core import get_db
 from src.app.models.buildings import Building
 from src.app.models.test_sessions import TestSession
 from src.app.models.users import User
-from src.app.models.ce_test import CETestSession, CETestStep
-from src.app.models.interface_test import InterfaceTestSession, InterfaceTestStep
+from src.app.models.ce_test import CETestSession, CETestDeviation
+from src.app.models.interface_test import InterfaceTestSession, InterfaceTestEvent
 
 
 class TestReportsIntegration:

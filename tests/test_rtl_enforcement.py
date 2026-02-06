@@ -15,12 +15,14 @@ from datetime import datetime, timedelta
 from jose import jwt
 
 from src.app.dependencies import (
-    create_access_token, 
-    get_current_active_user, 
-    check_token_revocation,
-    JWT_SECRET_KEY,
-    JWT_ALGORITHM
+    create_access_token,
+    get_current_active_user,
+    is_token_revoked
 )
+
+# JWT constants for testing - these should match what dependencies.py uses internally
+JWT_SECRET_KEY = "test-secret-key"
+JWT_ALGORITHM = "HS256"
 from src.app.schemas.token import TokenData
 
 

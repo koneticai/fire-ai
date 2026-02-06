@@ -11,6 +11,7 @@ from .evidence import Evidence
 from .defects import Defect
 from .rtl import TokenRevocationList
 from .rules import AS1851Rule, AS1851RuleBase, AS1851RuleCreate
+from .as1851_rule import AS1851RuleDB
 from .compliance_workflow import ComplianceWorkflow, ComplianceWorkflowInstance
 from .ce_test import CETestSession, CETestMeasurement, CETestDeviation, CETestReport
 from .interface_test import (
@@ -33,8 +34,9 @@ __all__ = [
     "Defect",
     "TokenRevocationList",
     "AS1851Rule",
-    "AS1851RuleBase", 
+    "AS1851RuleBase",
     "AS1851RuleCreate",
+    "AS1851RuleDB",
     "ComplianceWorkflow",
     "ComplianceWorkflowInstance",
     "CETestSession",
