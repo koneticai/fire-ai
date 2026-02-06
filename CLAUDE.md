@@ -53,3 +53,21 @@ Special characters in passwords must be URL-encoded in connection strings:
 - `*` → `%2A`
 - `#` → `%23`
 - `!` → `%21`
+
+---
+
+## Context Files
+
+**Read these before starting work to avoid expensive re-analysis:**
+
+| Context | Location | When to Read |
+|---------|----------|--------------|
+| Backend Context | `.claude/context/BACKEND-CONTEXT.md` | Before any backend work |
+| Full Repo Context | `.claude/context/REPO-CONTEXT.md` | For comprehensive codebase overview |
+| Validation Plan | `plans/validation-backend-90-percent-complete.md` | Before running/writing tests |
+
+**Future prompts start with:**
+```
+Read .claude/context/BACKEND-CONTEXT.md for repo context.
+[Then your actual task]
+```

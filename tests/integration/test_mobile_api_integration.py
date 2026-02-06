@@ -114,7 +114,7 @@ class TestMobileAPIIntegration:
         """Test mobile app downloading C&E scenario for offline use"""
         workflow_id = str(test_data["workflow"].id)
         
-        response = client.get(f"/v1/ce-tests/scenarios/{workflow_id}")
+        response = client.get(f"/v1/ce/tests/scenarios/{workflow_id}")
         
         assert response.status_code == 200
         data = response.json()
@@ -154,7 +154,7 @@ class TestMobileAPIIntegration:
             }
         }
         
-        response = client.post("/v1/ce-tests/sessions", json=session_data)
+        response = client.post("/v1/ce/tests/sessions", json=session_data)
         
         assert response.status_code == 201
         data = response.json()
@@ -175,7 +175,7 @@ class TestMobileAPIIntegration:
             "workflow_id": str(test_data["workflow"].id),
             "test_type": "stair_pressurization"
         }
-        session_response = client.post("/v1/ce-tests/sessions", json=session_data)
+        session_response = client.post("/v1/ce/tests/sessions", json=session_data)
         session_id = session_response.json()["id"]
 
         # Record test step with mobile-specific data
@@ -197,7 +197,7 @@ class TestMobileAPIIntegration:
             "evidence_ids": ["photo-123", "video-456"]
         }
         
-        response = client.post(f"/v1/ce-tests/sessions/{session_id}/steps", json=step_data)
+        response = client.post(f"/v1/ce/tests/sessions/{session_id}/steps", json=step_data)
         
         assert response.status_code == 201
         data = response.json()
@@ -218,7 +218,7 @@ class TestMobileAPIIntegration:
             "workflow_id": str(test_data["workflow"].id),
             "test_type": "stair_pressurization"
         }
-        session_response = client.post("/v1/ce-tests/sessions", json=session_data)
+        session_response = client.post("/v1/ce/tests/sessions", json=session_data)
         session_id = session_response.json()["id"]
 
         # Simulate offline test execution with multiple steps
@@ -252,7 +252,7 @@ class TestMobileAPIIntegration:
             "device_id": "mobile-device-123"
         }
         
-        response = client.post(f"/v1/ce-tests/sessions/{session_id}/sync", json=sync_data)
+        response = client.post(f"/v1/ce/tests/sessions/{session_id}/sync", json=sync_data)
         
         assert response.status_code == 200
         data = response.json()
@@ -271,7 +271,7 @@ class TestMobileAPIIntegration:
             "workflow_id": str(test_data["workflow"].id),
             "test_type": "stair_pressurization"
         }
-        session_response = client.post("/v1/ce-tests/sessions", json=session_data)
+        session_response = client.post("/v1/ce/tests/sessions", json=session_data)
         session_id = session_response.json()["id"]
 
         # Simulate CRDT document from mobile
@@ -299,7 +299,7 @@ class TestMobileAPIIntegration:
             }
         }
         
-        response = client.post(f"/v1/ce-tests/sessions/{session_id}/crdt-merge", json=crdt_data)
+        response = client.post(f"/v1/ce/tests/sessions/{session_id}/crdt-merge", json=crdt_data)
         
         assert response.status_code == 200
         data = response.json()
@@ -318,7 +318,7 @@ class TestMobileAPIIntegration:
             "workflow_id": str(test_data["workflow"].id),
             "test_type": "stair_pressurization"
         }
-        session_response = client.post("/v1/ce-tests/sessions", json=session_data)
+        session_response = client.post("/v1/ce/tests/sessions", json=session_data)
         session_id = session_response.json()["id"]
 
         # Upload evidence with device attestation
@@ -342,7 +342,7 @@ class TestMobileAPIIntegration:
         }
         
         # Simulate file upload (in real scenario, this would be multipart/form-data)
-        response = client.post(f"/v1/ce-tests/sessions/{session_id}/evidence", json=evidence_data)
+        response = client.post(f"/v1/ce/tests/sessions/{session_id}/evidence", json=evidence_data)
         
         assert response.status_code == 201
         data = response.json()
@@ -362,7 +362,7 @@ class TestMobileAPIIntegration:
             "workflow_id": str(test_data["workflow"].id),
             "test_type": "stair_pressurization"
         }
-        session_response = client.post("/v1/ce-tests/sessions", json=session_data)
+        session_response = client.post("/v1/ce/tests/sessions", json=session_data)
         session_id = session_response.json()["id"]
 
         # Record some steps
@@ -388,7 +388,7 @@ class TestMobileAPIIntegration:
         ]
 
         for step in steps:
-            client.post(f"/v1/ce-tests/sessions/{session_id}/steps", json=step)
+            client.post(f"/v1/ce/tests/sessions/{session_id}/steps", json=step)
 
         # Complete test
         completion_data = {
@@ -401,7 +401,7 @@ class TestMobileAPIIntegration:
             }
         }
         
-        response = client.post(f"/v1/ce-tests/sessions/{session_id}/complete", json=completion_data)
+        response = client.post(f"/v1/ce/tests/sessions/{session_id}/complete", json=completion_data)
         
         assert response.status_code == 200
         data = response.json()
@@ -425,7 +425,7 @@ class TestMobileAPIIntegration:
         workflow_id = str(test_data["workflow"].id)
         
         start_time = time.time()
-        response = client.get(f"/v1/ce-tests/scenarios/{workflow_id}")
+        response = client.get(f"/v1/ce/tests/scenarios/{workflow_id}")
         end_time = time.time()
         
         assert response.status_code == 200
@@ -440,7 +440,7 @@ class TestMobileAPIIntegration:
         }
         
         start_time = time.time()
-        response = client.post("/v1/ce-tests/sessions", json=session_data)
+        response = client.post("/v1/ce/tests/sessions", json=session_data)
         end_time = time.time()
         
         assert response.status_code == 201
@@ -459,7 +459,7 @@ class TestMobileAPIIntegration:
         }
         
         start_time = time.time()
-        response = client.post(f"/v1/ce-tests/sessions/{session_id}/steps", json=step_data)
+        response = client.post(f"/v1/ce/tests/sessions/{session_id}/steps", json=step_data)
         end_time = time.time()
         
         assert response.status_code == 201
@@ -468,7 +468,7 @@ class TestMobileAPIIntegration:
     def test_mobile_error_handling(self, client: TestClient):
         """Test mobile API error handling"""
         # Test invalid scenario ID
-        response = client.get("/v1/ce-tests/scenarios/invalid-uuid")
+        response = client.get("/v1/ce/tests/scenarios/invalid-uuid")
         assert response.status_code == 400
 
         # Test invalid session creation
@@ -479,11 +479,11 @@ class TestMobileAPIIntegration:
             "test_type": "stair_pressurization"
         }
         
-        response = client.post("/v1/ce-tests/sessions", json=invalid_session_data)
+        response = client.post("/v1/ce/tests/sessions", json=invalid_session_data)
         assert response.status_code == 400
 
         # Test invalid step recording
-        response = client.post("/v1/ce-tests/sessions/invalid-uuid/steps", json={})
+        response = client.post("/v1/ce/tests/sessions/invalid-uuid/steps", json={})
         assert response.status_code == 400
 
     def test_mobile_connectivity_simulation(self, client: TestClient, test_data):
@@ -492,7 +492,7 @@ class TestMobileAPIIntegration:
         workflow_id = str(test_data["workflow"].id)
         
         # First download scenario (online)
-        response = client.get(f"/v1/ce-tests/scenarios/{workflow_id}")
+        response = client.get(f"/v1/ce/tests/scenarios/{workflow_id}")
         assert response.status_code == 200
         scenario = response.json()
         
@@ -515,7 +515,7 @@ class TestMobileAPIIntegration:
             }
         }
         
-        response = client.post("/v1/ce-tests/sessions", json=session_data)
+        response = client.post("/v1/ce/tests/sessions", json=session_data)
         assert response.status_code == 201
         session_data_response = response.json()
         

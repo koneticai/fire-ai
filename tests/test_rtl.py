@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from src.app.models.rtl import TokenRevocationList
-from src.app.database.core import get_db_session
+from src.app.database.core import get_db
 
 
 class TestTokenRevocationList:

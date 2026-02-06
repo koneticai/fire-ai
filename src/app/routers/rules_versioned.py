@@ -1,226 +1,208 @@
 """
 Versioned AS1851 rules router for FireMode Compliance Platform
 Implements immutable rule management with semantic versioning
+
+Refactored to use async SQLAlchemy instead of raw psycopg2.
 """
 
-import json
-from datetime import datetime
-from typing import List
+import ipaddress
+from typing import List, Optional
 from uuid import UUID
 
-import psycopg2
 import semver
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from sqlalchemy import select, and_
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import AS1851Rule, AS1851RuleCreate
+from ..models import AS1851Rule, AS1851RuleCreate, AS1851RuleDB
+from ..models.audit_log import AuditLog
 from ..dependencies import get_current_active_user
 from ..database.core import get_db
-from sqlalchemy.ext.asyncio import AsyncSession
-from ..schemas.token import TokenData, APIResponse
+from ..schemas.token import TokenData
 
 router = APIRouter(tags=["AS1851 Rules (Versioned)"])
 
-@router.post("/", response_model=AS1851Rule, status_code=status.HTTP_201_CREATED, 
-             summary="Create Versioned AS1851 Rule", 
-             description="Creates a new versioned AS1851 rule. Each version is immutable and prevents duplicates.")
+
+def _safe_client_ip(request: Request) -> Optional[str]:
+    """Extract a valid IP address from the request, or return None.
+
+    Checks X-Forwarded-For first (proxy-aware), then request.client.host.
+    Returns None when neither source yields a valid IPv4/IPv6 literal,
+    which is safe for PostgreSQL INET columns.
+    """
+    raw_ip: Optional[str] = None
+
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        raw_ip = forwarded.split(",")[0].strip()
+    elif request.client:
+        raw_ip = request.client.host
+
+    if raw_ip:
+        try:
+            ipaddress.ip_address(raw_ip)
+            return raw_ip
+        except ValueError:
+            return None
+    return None
+
+
+@router.post(
+    "/",
+    response_model=AS1851Rule,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create Versioned AS1851 Rule",
+    description="Creates a new versioned AS1851 rule. Each version is immutable and prevents duplicates."
+)
 async def create_versioned_rule(
     rule: AS1851RuleCreate,
     current_user: TokenData = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Creates a new, versioned AS1851 rule. Rejects duplicates."""
-    
-    try:
-        with conn.cursor() as cursor:
-            # Check if this exact version already exists
-            cursor.execute("""
-                SELECT COUNT(*) FROM as1851_rules 
-                WHERE rule_code = %s AND version = %s
-            """, (rule.rule_code, rule.version))
-            
-            existing_count = cursor.fetchone()[0]
-            if existing_count > 0:
-                conn.close()
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Rule {rule.rule_code} version {rule.version} already exists."
-                )
-            
-            # Insert the new versioned rule
-            cursor.execute("""
-                INSERT INTO as1851_rules 
-                (rule_code, version, rule_name, description, rule_schema, is_active)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                RETURNING id, created_at
-            """, (
-                rule.rule_code,
-                rule.version,
-                rule.rule_name,
-                rule.description,
-                json.dumps(rule.rule_schema),
-                True
-            ))
-            
-            result = cursor.fetchone()
-            rule_id, created_at = result
-            
-            conn.commit()
-        
-        conn.close()
-        
-        return AS1851Rule(
-            id=rule_id,
-            rule_code=rule.rule_code,
-            version=rule.version,
-            rule_name=rule.rule_name,
-            description=rule.description,
-            rule_schema=rule.rule_schema,
-            is_active=True,
-            created_at=created_at
+    # Check if this exact version already exists
+    existing_query = select(AS1851RuleDB).where(
+        and_(
+            AS1851RuleDB.rule_code == rule.rule_code,
+            AS1851RuleDB.version == rule.version
         )
-        
-    except psycopg2.IntegrityError as e:
-        conn.rollback()
-        conn.close()
-        if "rule_code_version" in str(e):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Rule {rule.rule_code} version {rule.version} already exists."
-            )
+    )
+    result = await db.execute(existing_query)
+    if result.scalar_one_or_none():
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Database integrity error: {str(e)}"
-        )
-    except HTTPException:
-        conn.close()
-        raise
-    except Exception as e:
-        conn.rollback()
-        conn.close()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create rule: {str(e)}"
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Rule {rule.rule_code} version {rule.version} already exists."
         )
 
-@router.get("/", response_model=List[AS1851Rule], 
-            summary="List All Active Versioned Rules", 
-            description="Lists all active AS1851 rule versions available in the system.")
+    # Insert the new versioned rule
+    new_rule = AS1851RuleDB(
+        rule_code=rule.rule_code,
+        version=rule.version,
+        rule_name=rule.rule_name,
+        description=rule.description,
+        rule_schema=rule.rule_schema,
+        is_active=True
+    )
+
+    db.add(new_rule)
+    await db.commit()
+    await db.refresh(new_rule)
+
+    return AS1851Rule(
+        id=new_rule.id,
+        rule_code=new_rule.rule_code,
+        version=new_rule.version,
+        rule_name=new_rule.rule_name,
+        description=new_rule.description,
+        rule_schema=new_rule.rule_schema,
+        is_active=True,
+        created_at=new_rule.created_at
+    )
+
+
+@router.get(
+    "/",
+    response_model=List[AS1851Rule],
+    summary="List All Active Versioned Rules",
+    description="Lists all active AS1851 rule versions available in the system."
+)
 async def get_all_active_versioned_rules(
     current_user: TokenData = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Lists all active AS1851 rules (all versions)."""
-    
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT id, rule_code, version, rule_name, description, rule_schema, 
-                       is_active, created_at
-                FROM as1851_rules 
-                WHERE is_active = true
-                ORDER BY rule_code, version DESC
-            """)
-            
-            rows = cursor.fetchall()
-            rules = []
-            
-            for row in rows:
-                rule = AS1851Rule(
-                    id=row[0],
-                    rule_code=row[1],
-                    version=row[2],
-                    rule_name=row[3],
-                    description=row[4],
-                    rule_schema=row[5],
-                    is_active=row[6],
-                    created_at=row[7]
-                )
-                rules.append(rule)
-        
-        conn.close()
-        return rules
-        
-    except Exception as e:
-        conn.close()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list rules: {str(e)}"
-        )
+    query = (
+        select(AS1851RuleDB)
+        .where(AS1851RuleDB.is_active == True)
+        .order_by(AS1851RuleDB.rule_code, AS1851RuleDB.version.desc())
+    )
+    result = await db.execute(query)
+    db_rules = result.scalars().all()
 
-@router.get("/{rule_code}/latest", response_model=AS1851Rule, 
-            summary="Get Latest Active Rule Version", 
-            description="Gets the latest active version of a rule by its code using semantic versioning.")
+    return [
+        AS1851Rule(
+            id=rule.id,
+            rule_code=rule.rule_code,
+            version=rule.version,
+            rule_name=rule.rule_name,
+            description=rule.description,
+            rule_schema=rule.rule_schema,
+            is_active=rule.is_active,
+            created_at=rule.created_at
+        )
+        for rule in db_rules
+    ]
+
+
+@router.get(
+    "/{rule_code}/latest",
+    response_model=AS1851Rule,
+    summary="Get Latest Active Rule Version",
+    description="Gets the latest active version of a rule by its code using semantic versioning."
+)
 async def get_latest_active_rule_by_code(
     rule_code: str,
     current_user: TokenData = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Gets the latest active version of a rule by its code."""
-    
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT id, rule_code, version, rule_name, description, rule_schema, 
-                       is_active, created_at
-                FROM as1851_rules 
-                WHERE rule_code = %s AND is_active = true
-                ORDER BY version DESC
-            """, (rule_code,))
-            
-            rows = cursor.fetchall()
-            if not rows:
-                conn.close()
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, 
-                    detail=f"Active rule with code {rule_code} not found."
-                )
-            
-            # Find the highest semantic version
-            latest_rule = None
-            latest_version = None
-            
-            for row in rows:
-                try:
-                    current_version = semver.VersionInfo.parse(row[2])
-                    if latest_version is None or current_version > latest_version:
-                        latest_version = current_version
-                        latest_rule = AS1851Rule(
-                            id=row[0],
-                            rule_code=row[1],
-                            version=row[2],
-                            rule_name=row[3],
-                            description=row[4],
-                            rule_schema=row[5],
-                            is_active=row[6],
-                            created_at=row[7]
-                        )
-                except ValueError:
-                    # Skip invalid semantic versions
-                    continue
-            
-            if latest_rule is None:
-                conn.close()
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, 
-                    detail=f"No valid semantic versions found for rule {rule_code}"
-                )
-        
-        conn.close()
-        return latest_rule
-        
-    except HTTPException:
-        conn.close()
-        raise
-    except Exception as e:
-        conn.close()
+    query = (
+        select(AS1851RuleDB)
+        .where(
+            and_(
+                AS1851RuleDB.rule_code == rule_code,
+                AS1851RuleDB.is_active == True
+            )
+        )
+        .order_by(AS1851RuleDB.version.desc())
+    )
+    result = await db.execute(query)
+    db_rules = result.scalars().all()
+
+    if not db_rules:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get rule: {str(e)}"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Active rule with code {rule_code} not found."
         )
 
-@router.get("/{rule_code}/versions", response_model=List[AS1851Rule], 
-            summary="Get All Rule Versions", 
-            description="Gets all versions of a specific rule by its code, sorted by version.")
+    # Find the highest semantic version
+    latest_rule = None
+    latest_version = None
+
+    for rule in db_rules:
+        try:
+            current_version = semver.VersionInfo.parse(rule.version)
+            if latest_version is None or current_version > latest_version:
+                latest_version = current_version
+                latest_rule = rule
+        except ValueError:
+            # Skip invalid semantic versions
+            continue
+
+    if latest_rule is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No valid semantic versions found for rule {rule_code}"
+        )
+
+    return AS1851Rule(
+        id=latest_rule.id,
+        rule_code=latest_rule.rule_code,
+        version=latest_rule.version,
+        rule_name=latest_rule.rule_name,
+        description=latest_rule.description,
+        rule_schema=latest_rule.rule_schema,
+        is_active=latest_rule.is_active,
+        created_at=latest_rule.created_at
+    )
+
+
+@router.get(
+    "/{rule_code}/versions",
+    response_model=List[AS1851Rule],
+    summary="Get All Rule Versions",
+    description="Gets all versions of a specific rule by its code, sorted by version."
+)
 async def get_all_rule_versions(
     rule_code: str,
     include_inactive: bool = False,
@@ -228,55 +210,48 @@ async def get_all_rule_versions(
     db: AsyncSession = Depends(get_db)
 ):
     """Gets all versions of a specific rule by its code."""
-    
-    try:
-        with conn.cursor() as cursor:
-            if include_inactive:
-                cursor.execute("""
-                    SELECT id, rule_code, version, rule_name, description, rule_schema, 
-                           is_active, created_at
-                    FROM as1851_rules 
-                    WHERE rule_code = %s
-                    ORDER BY version DESC
-                """, (rule_code,))
-            else:
-                cursor.execute("""
-                    SELECT id, rule_code, version, rule_name, description, rule_schema, 
-                           is_active, created_at
-                    FROM as1851_rules 
-                    WHERE rule_code = %s AND is_active = true
-                    ORDER BY version DESC
-                """, (rule_code,))
-            
-            rows = cursor.fetchall()
-            rules = []
-            
-            for row in rows:
-                rule = AS1851Rule(
-                    id=row[0],
-                    rule_code=row[1],
-                    version=row[2],
-                    rule_name=row[3],
-                    description=row[4],
-                    rule_schema=row[5],
-                    is_active=row[6],
-                    created_at=row[7]
+    if include_inactive:
+        query = (
+            select(AS1851RuleDB)
+            .where(AS1851RuleDB.rule_code == rule_code)
+            .order_by(AS1851RuleDB.version.desc())
+        )
+    else:
+        query = (
+            select(AS1851RuleDB)
+            .where(
+                and_(
+                    AS1851RuleDB.rule_code == rule_code,
+                    AS1851RuleDB.is_active == True
                 )
-                rules.append(rule)
-        
-        conn.close()
-        return rules
-        
-    except Exception as e:
-        conn.close()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get rule versions: {str(e)}"
+            )
+            .order_by(AS1851RuleDB.version.desc())
         )
 
-@router.put("/id/{rule_id}/deactivate", response_model=AS1851Rule, 
-            summary="Deactivate Rule Version", 
-            description="Deactivates a specific rule version. This is the only way to 'update' a rule - no in-place modifications allowed.")
+    result = await db.execute(query)
+    db_rules = result.scalars().all()
+
+    return [
+        AS1851Rule(
+            id=rule.id,
+            rule_code=rule.rule_code,
+            version=rule.version,
+            rule_name=rule.rule_name,
+            description=rule.description,
+            rule_schema=rule.rule_schema,
+            is_active=rule.is_active,
+            created_at=rule.created_at
+        )
+        for rule in db_rules
+    ]
+
+
+@router.put(
+    "/id/{rule_id}/deactivate",
+    response_model=AS1851Rule,
+    summary="Deactivate Rule Version",
+    description="Deactivates a specific rule version. This is the only way to 'update' a rule - no in-place modifications allowed."
+)
 async def deactivate_rule_version(
     rule_id: UUID,
     request: Request,
@@ -284,82 +259,58 @@ async def deactivate_rule_version(
     db: AsyncSession = Depends(get_db)
 ):
     """Deactivates a specific rule version. This is the only way to 'update' a rule."""
-    
-    try:
-        with conn.cursor() as cursor:
-            # Get the current rule before deactivating
-            cursor.execute("""
-                SELECT id, rule_code, version, rule_name, description, rule_schema, 
-                       is_active, created_at
-                FROM as1851_rules 
-                WHERE id = %s
-            """, (rule_id,))
-            
-            row = cursor.fetchone()
-            if not row:
-                conn.close()
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, 
-                    detail="Rule not found"
-                )
-            
-            if not row[6]:  # is_active
-                conn.close()
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST, 
-                    detail="Rule is already deactivated"
-                )
-            
-            # Deactivate the rule
-            cursor.execute("""
-                UPDATE as1851_rules 
-                SET is_active = false 
-                WHERE id = %s
-            """, (rule_id,))
-            
-            # Log the deactivation in audit log
-            client_ip = request.client.host if request.client else "unknown"
-            user_agent = request.headers.get("user-agent", "unknown")
-            
-            cursor.execute("""
-                INSERT INTO audit_log 
-                (user_id, action, resource_type, resource_id, old_values, new_values, ip_address, user_agent)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                current_user.user_id,
-                "deactivate_rule",
-                "as1851_rule",
-                rule_id,
-                json.dumps({"is_active": True, "rule_code": row[1], "version": row[2]}),
-                json.dumps({"is_active": False, "rule_code": row[1], "version": row[2]}),
-                client_ip,
-                user_agent
-            ))
-            
-            conn.commit()
-            
-            # Return the deactivated rule
-            deactivated_rule = AS1851Rule(
-                id=row[0],
-                rule_code=row[1],
-                version=row[2],
-                rule_name=row[3],
-                description=row[4],
-                rule_schema=row[5],
-                is_active=False,  # Now deactivated
-                created_at=row[7]
-            )
-        
-        conn.close()
-        return deactivated_rule
-        
-    except HTTPException:
-        conn.close()
-        raise
-    except Exception as e:
-        conn.rollback()
-        conn.close()
+    # Get the current rule before deactivating
+    query = select(AS1851RuleDB).where(AS1851RuleDB.id == rule_id)
+    result = await db.execute(query)
+    rule = result.scalar_one_or_none()
+
+    if not rule:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to deactivate rule: {str(e)}"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Rule not found"
         )
+
+    if not rule.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Rule is already deactivated"
+        )
+
+    # Deactivate the rule
+    rule.is_active = False
+
+    # Log the deactivation in audit log
+    client_ip = _safe_client_ip(request)
+    user_agent = request.headers.get("user-agent", "unknown")
+
+    audit_entry = AuditLog(
+        user_id=current_user.user_id,
+        action="deactivate_rule",
+        resource_type="as1851_rule",
+        resource_id=rule_id,
+        old_values={
+            "is_active": True,
+            "rule_code": rule.rule_code,
+            "version": rule.version
+        },
+        new_values={
+            "is_active": False,
+            "rule_code": rule.rule_code,
+            "version": rule.version
+        },
+        ip_address=client_ip,
+        user_agent=user_agent
+    )
+    db.add(audit_entry)
+    await db.commit()
+
+    return AS1851Rule(
+        id=rule.id,
+        rule_code=rule.rule_code,
+        version=rule.version,
+        rule_name=rule.rule_name,
+        description=rule.description,
+        rule_schema=rule.rule_schema,
+        is_active=False,
+        created_at=rule.created_at
+    )

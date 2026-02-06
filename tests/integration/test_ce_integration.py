@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.main import app
 from src.app.database.core import get_db
-from src.app.models.ce_test import CETestSession, CETestStep, CETestDeviation
+from src.app.models.ce_test import CETestSession, CETestDeviation
 from src.app.models.compliance_workflow import ComplianceWorkflow
 from src.app.models.buildings import Building
 from src.app.models.test_sessions import TestSession
@@ -115,7 +115,7 @@ class TestCEIntegration:
         """Test downloading C&E scenario for offline use"""
         workflow_id = str(test_data["workflow"].id)
         
-        response = client.get(f"/v1/ce-tests/scenarios/{workflow_id}")
+        response = client.get(f"/v1/ce/tests/scenarios/{workflow_id}")
         
         assert response.status_code == 200
         data = response.json()
@@ -135,7 +135,7 @@ class TestCEIntegration:
             "test_type": "stair_pressurization"
         }
         
-        response = client.post("/v1/ce-tests/sessions", json=session_data)
+        response = client.post("/v1/ce/tests/sessions", json=session_data)
         
         assert response.status_code == 201
         data = response.json()
@@ -155,7 +155,7 @@ class TestCEIntegration:
             "workflow_id": str(test_data["workflow"].id),
             "test_type": "stair_pressurization"
         }
-        session_response = client.post("/v1/ce-tests/sessions", json=session_data)
+        session_response = client.post("/v1/ce/tests/sessions", json=session_data)
         session_id = session_response.json()["id"]
 
         # Record test step
@@ -170,7 +170,7 @@ class TestCEIntegration:
             "notes": "Panel activated successfully"
         }
         
-        response = client.post(f"/v1/ce-tests/sessions/{session_id}/steps", json=step_data)
+        response = client.post(f"/v1/ce/tests/sessions/{session_id}/steps", json=step_data)
         
         assert response.status_code == 201
         data = response.json()
@@ -189,7 +189,7 @@ class TestCEIntegration:
             "workflow_id": str(test_data["workflow"].id),
             "test_type": "stair_pressurization"
         }
-        session_response = client.post("/v1/ce-tests/sessions", json=session_data)
+        session_response = client.post("/v1/ce/tests/sessions", json=session_data)
         session_id = session_response.json()["id"]
 
         # Record steps with deviations
@@ -215,7 +215,7 @@ class TestCEIntegration:
         ]
 
         for step in steps:
-            client.post(f"/v1/ce-tests/sessions/{session_id}/steps", json=step)
+            client.post(f"/v1/ce/tests/sessions/{session_id}/steps", json=step)
 
         # Complete test and analyze deviations
         completion_data = {
@@ -223,7 +223,7 @@ class TestCEIntegration:
             "overall_status": "completed_with_deviations"
         }
         
-        response = client.post(f"/v1/ce-tests/sessions/{session_id}/complete", json=completion_data)
+        response = client.post(f"/v1/ce/tests/sessions/{session_id}/complete", json=completion_data)
         
         assert response.status_code == 200
         data = response.json()
@@ -248,11 +248,11 @@ class TestCEIntegration:
             "workflow_id": str(test_data["workflow"].id),
             "test_type": "stair_pressurization"
         }
-        session_response = client.post("/v1/ce-tests/sessions", json=session_data)
+        session_response = client.post("/v1/ce/tests/sessions", json=session_data)
         session_id = session_response.json()["id"]
 
         # Get session details
-        response = client.get(f"/v1/ce-tests/sessions/{session_id}")
+        response = client.get(f"/v1/ce/tests/sessions/{session_id}")
         
         assert response.status_code == 200
         data = response.json()
@@ -271,7 +271,7 @@ class TestCEIntegration:
             "workflow_id": str(test_data["workflow"].id),
             "test_type": "stair_pressurization"
         }
-        session_response = client.post("/v1/ce-tests/sessions", json=session_data)
+        session_response = client.post("/v1/ce/tests/sessions", json=session_data)
         session_id = session_response.json()["id"]
 
         # Simulate two technicians submitting results
@@ -306,14 +306,14 @@ class TestCEIntegration:
         }
 
         # Submit both results
-        response1 = client.post(f"/v1/ce-tests/sessions/{session_id}/crdt-merge", json=technician1_results)
-        response2 = client.post(f"/v1/ce-tests/sessions/{session_id}/crdt-merge", json=technician2_results)
+        response1 = client.post(f"/v1/ce/tests/sessions/{session_id}/crdt-merge", json=technician1_results)
+        response2 = client.post(f"/v1/ce/tests/sessions/{session_id}/crdt-merge", json=technician2_results)
 
         assert response1.status_code == 200
         assert response2.status_code == 200
 
         # Verify merged results
-        session_response = client.get(f"/v1/ce-tests/sessions/{session_id}")
+        session_response = client.get(f"/v1/ce/tests/sessions/{session_id}")
         session_data = session_response.json()
         
         assert len(session_data["steps"]) == 2
@@ -329,7 +329,7 @@ class TestCEIntegration:
             "workflow_id": str(test_data["workflow"].id),
             "test_type": "stair_pressurization"
         }
-        session_response = client.post("/v1/ce-tests/sessions", json=session_data)
+        session_response = client.post("/v1/ce/tests/sessions", json=session_data)
         session_id = session_response.json()["id"]
 
         # Record step with critical deviation (>10 seconds)
@@ -343,7 +343,7 @@ class TestCEIntegration:
             "status": "completed"
         }
         
-        client.post(f"/v1/ce-tests/sessions/{session_id}/steps", json=step_data)
+        client.post(f"/v1/ce/tests/sessions/{session_id}/steps", json=step_data)
 
         # Complete test
         completion_data = {
@@ -351,7 +351,7 @@ class TestCEIntegration:
             "overall_status": "completed_with_deviations"
         }
         
-        response = client.post(f"/v1/ce-tests/sessions/{session_id}/complete", json=completion_data)
+        response = client.post(f"/v1/ce/tests/sessions/{session_id}/complete", json=completion_data)
         
         assert response.status_code == 200
         data = response.json()
@@ -374,7 +374,7 @@ class TestCEIntegration:
             "workflow_id": str(test_data["workflow"].id),
             "test_type": "stair_pressurization"
         }
-        session_response = client.post("/v1/ce-tests/sessions", json=session_data)
+        session_response = client.post("/v1/ce/tests/sessions", json=session_data)
         session_id = session_response.json()["id"]
 
         # Record step with evidence
@@ -389,7 +389,7 @@ class TestCEIntegration:
             "evidence_ids": ["evidence-123", "evidence-456"]
         }
         
-        response = client.post(f"/v1/ce-tests/sessions/{session_id}/steps", json=step_data)
+        response = client.post(f"/v1/ce/tests/sessions/{session_id}/steps", json=step_data)
         
         assert response.status_code == 201
         data = response.json()
@@ -412,7 +412,7 @@ class TestCEIntegration:
         }
         
         start_time = time.time()
-        response = client.post("/v1/ce-tests/sessions", json=session_data)
+        response = client.post("/v1/ce/tests/sessions", json=session_data)
         end_time = time.time()
         
         assert response.status_code == 201
@@ -432,7 +432,7 @@ class TestCEIntegration:
         }
         
         start_time = time.time()
-        client.post(f"/v1/ce-tests/sessions/{session_id}/steps", json=step_data)
+        client.post(f"/v1/ce/tests/sessions/{session_id}/steps", json=step_data)
         end_time = time.time()
         
         assert (end_time - start_time) < 0.2  # <200ms requirement

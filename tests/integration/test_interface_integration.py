@@ -12,9 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.main import app
 from src.app.database.core import get_db
 from src.app.models.interface_test import (
-    InterfaceTestSession, 
-    InterfaceTestStep, 
-    InterfaceTestResult
+    InterfaceTestSession,
+    InterfaceTestEvent
 )
 from src.app.models.buildings import Building
 from src.app.models.test_sessions import TestSession

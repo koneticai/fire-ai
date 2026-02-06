@@ -131,7 +131,7 @@ class TestCompleteWorkflowE2E:
         
         # Step 2: Download C&E scenario for mobile
         workflow_id = str(test_data["workflow"].id)
-        response = client.get(f"/v1/ce-tests/scenarios/{workflow_id}")
+        response = client.get(f"/v1/ce/tests/scenarios/{workflow_id}")
         assert response.status_code == 200
         scenario_data = response.json()
         assert scenario_data["id"] == workflow_id
@@ -144,7 +144,7 @@ class TestCompleteWorkflowE2E:
             "test_type": "stair_pressurization"
         }
         
-        response = client.post("/v1/ce-tests/sessions", json=ce_session_data)
+        response = client.post("/v1/ce/tests/sessions", json=ce_session_data)
         assert response.status_code == 201
         ce_session_id = response.json()["id"]
         
@@ -183,7 +183,7 @@ class TestCompleteWorkflowE2E:
         ]
         
         for step in ce_steps:
-            response = client.post(f"/v1/ce-tests/sessions/{ce_session_id}/steps", json=step)
+            response = client.post(f"/v1/ce/tests/sessions/{ce_session_id}/steps", json=step)
             assert response.status_code == 201
         
         # Step 5: Complete C&E test and analyze deviations
@@ -192,7 +192,7 @@ class TestCompleteWorkflowE2E:
             "overall_status": "completed_with_deviations"
         }
         
-        response = client.post(f"/v1/ce-tests/sessions/{ce_session_id}/complete", json=ce_completion_data)
+        response = client.post(f"/v1/ce/tests/sessions/{ce_session_id}/complete", json=ce_completion_data)
         assert response.status_code == 200
         ce_results = response.json()
         assert "deviations" in ce_results
@@ -293,7 +293,7 @@ class TestCompleteWorkflowE2E:
         
         # Step 9: Verify data flows correctly between components
         # Check C&E test session details
-        response = client.get(f"/v1/ce-tests/sessions/{ce_session_id}")
+        response = client.get(f"/v1/ce/tests/sessions/{ce_session_id}")
         assert response.status_code == 200
         ce_session_details = response.json()
         assert len(ce_session_details["steps"]) == 3
@@ -310,7 +310,7 @@ class TestCompleteWorkflowE2E:
         # Step 10: Verify performance within acceptable limits
         # Test API response times
         start_time = time.time()
-        response = client.get(f"/v1/ce-tests/sessions/{ce_session_id}")
+        response = client.get(f"/v1/ce/tests/sessions/{ce_session_id}")
         end_time = time.time()
         assert (end_time - start_time) < 0.3  # <300ms
         
@@ -347,7 +347,7 @@ class TestCompleteWorkflowE2E:
             "test_type": "stair_pressurization"
         }
         
-        response = client.post("/v1/ce-tests/sessions", json=ce_session_data)
+        response = client.post("/v1/ce/tests/sessions", json=ce_session_data)
         ce_session_id = response.json()["id"]
         
         # Execute C&E test with critical deviation (>10 seconds)
@@ -362,7 +362,7 @@ class TestCompleteWorkflowE2E:
             "notes": "Critical delay - panel took 15 seconds to activate"
         }
         
-        response = client.post(f"/v1/ce-tests/sessions/{ce_session_id}/steps", json=critical_step)
+        response = client.post(f"/v1/ce/tests/sessions/{ce_session_id}/steps", json=critical_step)
         assert response.status_code == 201
         
         # Complete C&E test
@@ -371,7 +371,7 @@ class TestCompleteWorkflowE2E:
             "overall_status": "completed_with_critical_deviations"
         }
         
-        response = client.post(f"/v1/ce-tests/sessions/{ce_session_id}/complete", json=ce_completion_data)
+        response = client.post(f"/v1/ce/tests/sessions/{ce_session_id}/complete", json=ce_completion_data)
         assert response.status_code == 200
         ce_results = response.json()
         
@@ -472,7 +472,7 @@ class TestCompleteWorkflowE2E:
             "test_type": "stair_pressurization"
         }
         
-        response = client.post("/v1/ce-tests/sessions", json=ce_session_data)
+        response = client.post("/v1/ce/tests/sessions", json=ce_session_data)
         ce_session_id = response.json()["id"]
         
         # Execute C&E test
@@ -486,7 +486,7 @@ class TestCompleteWorkflowE2E:
             "status": "completed"
         }
         
-        client.post(f"/v1/ce-tests/sessions/{ce_session_id}/steps", json=ce_step)
+        client.post(f"/v1/ce/tests/sessions/{ce_session_id}/steps", json=ce_step)
         
         # Create interface test session
         interface_session_data = {
@@ -527,10 +527,10 @@ class TestCompleteWorkflowE2E:
         # Check that all test sessions are linked to the same building
         response = client.get(f"/v1/buildings/{test_data['building'].id}")
         building_data = response.json()
-        assert building_data["id"] == str(test_data["building"].id")
+        assert building_data["id"] == str(test_data["building"].id)
         
         # Check that C&E and interface tests are linked to the same test session
-        response = client.get(f"/v1/ce-tests/sessions/{ce_session_id}")
+        response = client.get(f"/v1/ce/tests/sessions/{ce_session_id}")
         ce_data = response.json()
         assert ce_data["test_session_id"] == test_session_id
         

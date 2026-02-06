@@ -219,7 +219,6 @@ async def submit_evidence(
             # Consider implementing async retry queue for audit logs
         
         return EvidenceResponse(
-        return EvidenceResponse(
             evidence_id=result["evidence_id"],
             hash=result["hash"],
             status=result["status"],

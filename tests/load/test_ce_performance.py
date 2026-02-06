@@ -108,7 +108,7 @@ class TestCEPerformance:
             }
             
             start_time = time.time()
-            response = client.post("/v1/ce-tests/sessions", json=session_data)
+            response = client.post("/v1/ce/tests/sessions", json=session_data)
             end_time = time.time()
             
             return {
@@ -141,7 +141,7 @@ class TestCEPerformance:
             "workflow_id": str(test_data["workflow"].id),
             "test_type": "stair_pressurization"
         }
-        response = client.post("/v1/ce-tests/sessions", json=session_data)
+        response = client.post("/v1/ce/tests/sessions", json=session_data)
         session_id = response.json()["id"]
 
         def record_step(step_number):
@@ -156,7 +156,7 @@ class TestCEPerformance:
             }
             
             start_time = time.time()
-            response = client.post(f"/v1/ce-tests/sessions/{session_id}/steps", json=step_data)
+            response = client.post(f"/v1/ce/tests/sessions/{session_id}/steps", json=step_data)
             end_time = time.time()
             
             return {
@@ -188,7 +188,7 @@ class TestCEPerformance:
             "workflow_id": str(test_data["workflow"].id),
             "test_type": "stair_pressurization"
         }
-        response = client.post("/v1/ce-tests/sessions", json=session_data)
+        response = client.post("/v1/ce/tests/sessions", json=session_data)
         session_id = response.json()["id"]
 
         # Record steps with deviations
@@ -214,7 +214,7 @@ class TestCEPerformance:
         ]
 
         for step in steps:
-            client.post(f"/v1/ce-tests/sessions/{session_id}/steps", json=step)
+            client.post(f"/v1/ce/tests/sessions/{session_id}/steps", json=step)
 
         # Test deviation analysis performance
         completion_data = {
@@ -223,7 +223,7 @@ class TestCEPerformance:
         }
         
         start_time = time.time()
-        response = client.post(f"/v1/ce-tests/sessions/{session_id}/complete", json=completion_data)
+        response = client.post(f"/v1/ce/tests/sessions/{session_id}/complete", json=completion_data)
         end_time = time.time()
         
         assert response.status_code == 200
@@ -238,7 +238,7 @@ class TestCEPerformance:
             "workflow_id": str(test_data["workflow"].id),
             "test_type": "stair_pressurization"
         }
-        response = client.post("/v1/ce-tests/sessions", json=session_data)
+        response = client.post("/v1/ce/tests/sessions", json=session_data)
         session_id = response.json()["id"]
 
         def crdt_merge(device_id):
@@ -267,7 +267,7 @@ class TestCEPerformance:
             }
             
             start_time = time.time()
-            response = client.post(f"/v1/ce-tests/sessions/{session_id}/crdt-merge", json=crdt_data)
+            response = client.post(f"/v1/ce/tests/sessions/{session_id}/crdt-merge", json=crdt_data)
             end_time = time.time()
             
             return {
@@ -308,7 +308,7 @@ class TestCEPerformance:
                 "workflow_id": str(test_data["workflow"].id),
                 "test_type": "stair_pressurization"
             }
-            response = client.post("/v1/ce-tests/sessions", json=session_data)
+            response = client.post("/v1/ce/tests/sessions", json=session_data)
             session_id = response.json()["id"]
             session_ids.append(session_id)
 
@@ -323,7 +323,7 @@ class TestCEPerformance:
                     "expected_time": 2.0,
                     "status": "completed"
                 }
-                client.post(f"/v1/ce-tests/sessions/{session_id}/steps", json=step_data)
+                client.post(f"/v1/ce/tests/sessions/{session_id}/steps", json=step_data)
 
         # Check memory usage
         final_memory = process.memory_info().rss / 1024 / 1024  # MB
@@ -348,7 +348,7 @@ class TestCEPerformance:
             }
             
             start_time = time.time()
-            response = client.post("/v1/ce-tests/sessions", json=session_data)
+            response = client.post("/v1/ce/tests/sessions", json=session_data)
             end_time = time.time()
             session_creation_times.append(end_time - start_time)
             
@@ -366,7 +366,7 @@ class TestCEPerformance:
             }
             
             start_time = time.time()
-            response = client.post(f"/v1/ce-tests/sessions/{session_id}/steps", json=step_data)
+            response = client.post(f"/v1/ce/tests/sessions/{session_id}/steps", json=step_data)
             end_time = time.time()
             step_recording_times.append(end_time - start_time)
 
@@ -387,7 +387,7 @@ class TestCEPerformance:
             "workflow_id": str(test_data["workflow"].id),
             "test_type": "stair_pressurization"
         }
-        response = client.post("/v1/ce-tests/sessions", json=session_data)
+        response = client.post("/v1/ce/tests/sessions", json=session_data)
         session_id = response.json()["id"]
 
         def write_operation(step_number):
@@ -402,7 +402,7 @@ class TestCEPerformance:
             }
             
             start_time = time.time()
-            response = client.post(f"/v1/ce-tests/sessions/{session_id}/steps", json=step_data)
+            response = client.post(f"/v1/ce/tests/sessions/{session_id}/steps", json=step_data)
             end_time = time.time()
             
             return {
@@ -412,7 +412,7 @@ class TestCEPerformance:
 
         def read_operation():
             start_time = time.time()
-            response = client.get(f"/v1/ce-tests/sessions/{session_id}")
+            response = client.get(f"/v1/ce/tests/sessions/{session_id}")
             end_time = time.time()
             
             return {
@@ -455,7 +455,7 @@ class TestCEPerformance:
             }
             
             start_time = time.time()
-            response = client.post("/v1/ce-tests/sessions", json=invalid_data)
+            response = client.post("/v1/ce/tests/sessions", json=invalid_data)
             end_time = time.time()
             
             return {
