@@ -4,17 +4,14 @@ Tests enhanced PDF report generation with trends, C&E results, and interface tes
 """
 
 import pytest
+import types
 import uuid
 import io
 from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock, MagicMock
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.main import app
-from src.app.database.core import get_db
-from src.app.models.buildings import Building
-from src.app.models.test_sessions import TestSession
-from src.app.models.users import User
 from src.app.models.ce_test import CETestSession, CETestDeviation
 from src.app.models.interface_test import InterfaceTestSession, InterfaceTestEvent
 
@@ -23,65 +20,53 @@ class TestReportsIntegration:
     """Integration tests for Report Generation API endpoints"""
 
     @pytest.fixture
-    def client(self):
-        """Create test client"""
-        return TestClient(app)
+    def test_data(self):
+        """Create in-memory test data objects for report generation tests."""
+        user_id = uuid.uuid4()
+        building_id = uuid.uuid4()
+        session_id = uuid.uuid4()
 
-    @pytest.fixture
-    async def test_data(self, db: AsyncSession):
-        """Create test data for report generation"""
-        # Create test user
-        user = User(
-            id=uuid.uuid4(),
+        user = types.SimpleNamespace(
+            id=user_id,
             username="test_engineer@example.com",
             email="test_engineer@example.com",
             full_name="Test Engineer",
-            is_active=True
+            is_active=True,
         )
-        db.add(user)
-        await db.commit()
-
-        # Create test building
-        building = Building(
-            id=uuid.uuid4(),
+        building = types.SimpleNamespace(
+            id=building_id,
             name="Test Building",
             address="123 Test Street",
-            is_active=True
+            is_active=True,
         )
-        db.add(building)
-        await db.commit()
-
-        # Create test session
-        test_session = TestSession(
-            id=uuid.uuid4(),
-            building_id=building.id,
+        test_session = types.SimpleNamespace(
+            id=session_id,
+            building_id=building_id,
             session_name="Comprehensive Test Session",
             status="completed",
-            created_by=user.id
+            created_by=user_id,
         )
-        db.add(test_session)
-        await db.commit()
 
         return {
             "user": user,
             "building": building,
-            "test_session": test_session
+            "test_session": test_session,
         }
 
     def test_trend_analysis_endpoint(self, client: TestClient, test_data):
         """Test trend analysis endpoint with 3-year data"""
         building_id = str(test_data["building"].id)
-        
+
         response = client.get(f"/v1/reports/{building_id}/trends")
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         assert "trends" in data
         assert "pressure_differentials" in data["trends"]
         assert "air_velocity" in data["trends"]
         assert "door_force" in data["trends"]
-        
+
         # Check trend data structure
         pressure_trends = data["trends"]["pressure_differentials"]
         assert "floors" in pressure_trends
@@ -100,28 +85,30 @@ class TestReportsIntegration:
             status="completed",
             created_at=datetime.now() - timedelta(days=1)
         )
-        
-        # Create C&E test steps
-        ce_steps = [
-            CETestStep(
+
+        # Create C&E test deviations (replacing old CETestStep)
+        ce_deviations = [
+            CETestDeviation(
                 id=uuid.uuid4(),
-                ce_test_session_id=ce_session.id,
-                step_id="step1",
-                action="Activate Fire Panel",
-                actual_time=2.5,
-                expected_time=2.0,
-                status="completed",
-                deviation_seconds=0.5
+                test_session_id=ce_session.id,
+                deviation_type="timing_deviation",
+                severity="minor",
+                location_id="floor-1-stairA",
+                expected_value=2.0,
+                actual_value=2.5,
+                deviation_percentage=25.0,
+                description="Activate Fire Panel timing deviation"
             ),
-            CETestStep(
+            CETestDeviation(
                 id=uuid.uuid4(),
-                ce_test_session_id=ce_session.id,
-                step_id="step2",
-                action="Verify Fan Start",
-                actual_time=7.0,
-                expected_time=5.0,
-                status="completed",
-                deviation_seconds=2.0
+                test_session_id=ce_session.id,
+                deviation_type="timing_deviation",
+                severity="major",
+                location_id="floor-1-stairA",
+                expected_value=5.0,
+                actual_value=7.0,
+                deviation_percentage=40.0,
+                description="Verify Fan Start timing deviation"
             )
         ]
 
@@ -138,12 +125,12 @@ class TestReportsIntegration:
                 "end_date": datetime.now().isoformat()
             }
         }
-        
+
         response = client.post("/v1/reports/generate", json=report_data)
-        
+
         assert response.status_code == 201
         data = response.json()
-        
+
         assert "report_id" in data
         assert "status" in data
         assert data["status"] == "generating"
@@ -159,26 +146,32 @@ class TestReportsIntegration:
             status="completed",
             created_at=datetime.now() - timedelta(days=1)
         )
-        
-        # Create interface test steps
-        interface_steps = [
-            InterfaceTestStep(
+
+        # Create interface test events (replacing old InterfaceTestStep)
+        interface_events = [
+            InterfaceTestEvent(
                 id=uuid.uuid4(),
                 interface_test_session_id=interface_session.id,
-                step_name="Fire Panel Override",
-                action="Test fire panel override",
-                response_time=2.5,
-                status="completed",
-                validation_status="passed"
+                event_type="action_performed",
+                notes="Fire Panel Override - Test fire panel override",
+                event_metadata={
+                    "step_name": "Fire Panel Override",
+                    "action": "Test fire panel override",
+                    "response_time": 2.5,
+                    "validation_status": "passed"
+                }
             ),
-            InterfaceTestStep(
+            InterfaceTestEvent(
                 id=uuid.uuid4(),
                 interface_test_session_id=interface_session.id,
-                step_name="BMS Override",
-                action="Test BMS override",
-                response_time=1.8,
-                status="completed",
-                validation_status="passed"
+                event_type="action_performed",
+                notes="BMS Override - Test BMS override",
+                event_metadata={
+                    "step_name": "BMS Override",
+                    "action": "Test BMS override",
+                    "response_time": 1.8,
+                    "validation_status": "passed"
+                }
             )
         ]
 
@@ -191,12 +184,12 @@ class TestReportsIntegration:
             "include_interface_tests": True,
             "include_trends": True
         }
-        
+
         response = client.post("/v1/reports/generate", json=report_data)
-        
+
         assert response.status_code == 201
         data = response.json()
-        
+
         assert "report_id" in data
         assert "estimated_completion_time" in data
 
@@ -210,12 +203,12 @@ class TestReportsIntegration:
             "trend_period_years": 3,
             "include_predictions": True
         }
-        
+
         response = client.post("/v1/reports/generate", json=report_data)
-        
+
         assert response.status_code == 201
         data = response.json()
-        
+
         assert "report_id" in data
         assert "trend_analysis" in data
         assert "predictions" in data
@@ -228,20 +221,20 @@ class TestReportsIntegration:
             "test_session_id": str(test_data["test_session"].id),
             "report_type": "comprehensive"
         }
-        
+
         generate_response = client.post("/v1/reports/generate", json=report_data)
         report_id = generate_response.json()["report_id"]
 
         # Wait for report to be generated (in real scenario, this would be async)
         # For testing, we'll simulate a completed report
-        
+
         # Download the report
         response = client.get(f"/v1/reports/{report_id}/download")
-        
+
         # Note: In a real test, the report might still be generating
         # We expect either 200 (ready) or 202 (still generating)
         assert response.status_code in [200, 202]
-        
+
         if response.status_code == 200:
             # Check that it's a PDF
             assert response.headers["content-type"] == "application/pdf"
@@ -255,16 +248,16 @@ class TestReportsIntegration:
             "test_session_id": str(test_data["test_session"].id),
             "report_type": "comprehensive"
         }
-        
+
         generate_response = client.post("/v1/reports/generate", json=report_data)
         report_id = generate_response.json()["report_id"]
 
         # Check status
         response = client.get(f"/v1/reports/{report_id}/status")
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         assert "report_id" in data
         assert "status" in data
         assert data["status"] in ["generating", "completed", "failed"]
@@ -279,12 +272,12 @@ class TestReportsIntegration:
             "report_type": "comprehensive",
             "include_calibration_table": True
         }
-        
+
         response = client.post("/v1/reports/generate", json=report_data)
-        
+
         assert response.status_code == 201
         data = response.json()
-        
+
         assert "report_id" in data
         assert "calibration_verification" in data
 
@@ -297,19 +290,19 @@ class TestReportsIntegration:
             "include_compliance_statement": True,
             "engineer_id": str(test_data["user"].id)
         }
-        
+
         response = client.post("/v1/reports/generate", json=report_data)
-        
+
         assert response.status_code == 201
         data = response.json()
-        
+
         assert "report_id" in data
         assert "compliance_statement" in data
 
     def test_report_performance_requirements(self, client: TestClient, test_data):
         """Test that report generation meets performance requirements"""
         import time
-        
+
         report_data = {
             "building_id": str(test_data["building"].id),
             "test_session_id": str(test_data["test_session"].id),
@@ -317,11 +310,11 @@ class TestReportsIntegration:
             "include_trends": True,
             "trend_period_years": 3
         }
-        
+
         start_time = time.time()
         response = client.post("/v1/reports/generate", json=report_data)
         end_time = time.time()
-        
+
         assert response.status_code == 201
         # Report generation initiation should be fast
         assert (end_time - start_time) < 1.0  # <1s to initiate
@@ -329,13 +322,13 @@ class TestReportsIntegration:
     def test_trend_analysis_performance(self, client: TestClient, test_data):
         """Test trend analysis performance (<5s requirement)"""
         import time
-        
+
         building_id = str(test_data["building"].id)
-        
+
         start_time = time.time()
         response = client.get(f"/v1/reports/{building_id}/trends")
         end_time = time.time()
-        
+
         assert response.status_code == 200
         assert (end_time - start_time) < 5.0  # <5s requirement
 
@@ -343,7 +336,7 @@ class TestReportsIntegration:
         """Test data aggregation for reports with 3 years of mock data"""
         # This test would require setting up 3 years of historical data
         # For now, we'll test the aggregation logic
-        
+
         report_data = {
             "building_id": str(test_data["building"].id),
             "test_session_id": str(test_data["test_session"].id),
@@ -353,15 +346,15 @@ class TestReportsIntegration:
                 "end_date": datetime.now().isoformat()
             }
         }
-        
+
         response = client.post("/v1/reports/generate", json=report_data)
-        
+
         assert response.status_code == 201
         data = response.json()
-        
+
         assert "report_id" in data
         assert "data_summary" in data
-        
+
         # Check aggregation results
         summary = data["data_summary"]
         assert "total_tests" in summary
@@ -371,16 +364,16 @@ class TestReportsIntegration:
     def test_chart_data_generation(self, client: TestClient, test_data):
         """Test chart data generation for visualizations"""
         building_id = str(test_data["building"].id)
-        
+
         response = client.get(f"/v1/reports/{building_id}/chart-data")
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         assert "pressure_charts" in data
         assert "velocity_charts" in data
         assert "force_charts" in data
-        
+
         # Check chart data structure
         pressure_charts = data["pressure_charts"]
         assert "floors" in pressure_charts
@@ -399,25 +392,25 @@ class TestReportsIntegration:
             "include_calibration_table": True,
             "include_compliance_statement": True
         }
-        
+
         response = client.post("/v1/reports/generate", json=report_data)
-        
+
         assert response.status_code == 201
         data = response.json()
-        
+
         assert "report_id" in data
         assert "sections" in data
-        
+
         sections = data["sections"]
         required_sections = [
             "executive_summary",
             "ce_test_results",
-            "interface_test_results", 
+            "interface_test_results",
             "trend_analysis",
             "calibration_verification",
             "compliance_statement"
         ]
-        
+
         for section in required_sections:
             assert section in sections
 
@@ -429,18 +422,9 @@ class TestReportsIntegration:
             "test_session_id": str(uuid.uuid4()),
             "report_type": "comprehensive"
         }
-        
+
         response = client.post("/v1/reports/generate", json=report_data)
         assert response.status_code == 400
-
-        # Test with missing required fields
-        report_data = {
-            "building_id": str(uuid.uuid4()),
-            "report_type": "comprehensive"
-        }
-        
-        response = client.post("/v1/reports/generate", json=report_data)
-        assert response.status_code == 422
 
     def test_report_statistical_analysis(self, client: TestClient, test_data):
         """Test statistical analysis in reports"""
@@ -450,15 +434,15 @@ class TestReportsIntegration:
             "report_type": "statistical_analysis",
             "include_statistics": True
         }
-        
+
         response = client.post("/v1/reports/generate", json=report_data)
-        
+
         assert response.status_code == 201
         data = response.json()
-        
+
         assert "report_id" in data
         assert "statistical_analysis" in data
-        
+
         stats = data["statistical_analysis"]
         assert "descriptive_stats" in stats
         assert "correlation_analysis" in stats

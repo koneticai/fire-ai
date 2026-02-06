@@ -5,7 +5,7 @@ Handles rule management and fault classification
 Refactored to use async SQLAlchemy instead of raw psycopg2.
 """
 
-import json
+import ipaddress
 from datetime import datetime
 from typing import List, Any, Optional
 from uuid import UUID
@@ -36,10 +36,34 @@ class FaultClassificationResult(BaseModel):
     classifications: List[Any]
     confidence_scores: dict
     applied_rules: List[str]
-    timestamp: datetime = None
+    timestamp: Optional[datetime] = None
 
 
 router = APIRouter(tags=["AS1851 Rules"])
+
+
+def _safe_client_ip(request: Request) -> Optional[str]:
+    """Extract a valid IP address from the request, or return None.
+
+    Checks X-Forwarded-For first (proxy-aware), then request.client.host.
+    Returns None when neither source yields a valid IPv4/IPv6 literal,
+    which is safe for PostgreSQL INET columns.
+    """
+    raw_ip: Optional[str] = None
+
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        raw_ip = forwarded.split(",")[0].strip()
+    elif request.client:
+        raw_ip = request.client.host
+
+    if raw_ip:
+        try:
+            ipaddress.ip_address(raw_ip)
+            return raw_ip
+        except ValueError:
+            return None
+    return None
 
 
 @router.get(
@@ -169,9 +193,15 @@ async def classify_faults(
     db: AsyncSession = Depends(get_db)
 ):
     """Classify faults based on evidence and rules"""
+    # Validate evidence_id is a valid UUID before querying
+    try:
+        evidence_uuid = UUID(classification_request.evidence_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid evidence_id: must be a valid UUID")
+
     # Get evidence details
     evidence_query = select(Evidence).where(
-        Evidence.id == classification_request.evidence_id
+        Evidence.id == evidence_uuid
     )
     result = await db.execute(evidence_query)
     evidence = result.scalar_one_or_none()
@@ -213,7 +243,7 @@ async def classify_faults(
         confidence_scores[rule.rule_code] = 0.85  # Mock confidence score
 
     # Log the classification in audit_log
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = _safe_client_ip(request)
     user_agent = request.headers.get("user-agent", "unknown")
 
     audit_entry = AuditLog(
@@ -221,11 +251,11 @@ async def classify_faults(
         action="classify_faults",
         resource_type="evidence",
         resource_id=evidence.id,
-        new_values=json.dumps({
+        new_values={
             "rule_codes": classification_request.rule_codes,
             "classifications": classifications,
             "confidence_scores": confidence_scores
-        }),
+        },
         ip_address=client_ip,
         user_agent=user_agent
     )
@@ -336,6 +366,7 @@ async def update_rule(
 )
 async def deactivate_rule(
     rule_code: str,
+    request: Request,
     current_user: TokenData = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -347,7 +378,34 @@ async def deactivate_rule(
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
 
+    if not rule.is_active:
+        raise HTTPException(status_code=400, detail="Rule is already deactivated")
+
     rule.is_active = False
+
+    # Audit log for compliance traceability (parity with versioned endpoint)
+    client_ip = _safe_client_ip(request)
+    user_agent = request.headers.get("user-agent", "unknown")
+
+    audit_entry = AuditLog(
+        user_id=current_user.user_id,
+        action="deactivate_rule",
+        resource_type="as1851_rule",
+        resource_id=rule.id,
+        old_values={
+            "is_active": True,
+            "rule_code": rule.rule_code,
+            "version": rule.version,
+        },
+        new_values={
+            "is_active": False,
+            "rule_code": rule.rule_code,
+            "version": rule.version,
+        },
+        ip_address=client_ip,
+        user_agent=user_agent,
+    )
+    db.add(audit_entry)
     await db.commit()
 
     return APIResponse(

@@ -5,8 +5,8 @@ Implements immutable rule management with semantic versioning
 Refactored to use async SQLAlchemy instead of raw psycopg2.
 """
 
-import json
-from typing import List
+import ipaddress
+from typing import List, Optional
 from uuid import UUID
 
 import semver
@@ -21,6 +21,30 @@ from ..database.core import get_db
 from ..schemas.token import TokenData
 
 router = APIRouter(tags=["AS1851 Rules (Versioned)"])
+
+
+def _safe_client_ip(request: Request) -> Optional[str]:
+    """Extract a valid IP address from the request, or return None.
+
+    Checks X-Forwarded-For first (proxy-aware), then request.client.host.
+    Returns None when neither source yields a valid IPv4/IPv6 literal,
+    which is safe for PostgreSQL INET columns.
+    """
+    raw_ip: Optional[str] = None
+
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        raw_ip = forwarded.split(",")[0].strip()
+    elif request.client:
+        raw_ip = request.client.host
+
+    if raw_ip:
+        try:
+            ipaddress.ip_address(raw_ip)
+            return raw_ip
+        except ValueError:
+            return None
+    return None
 
 
 @router.post(
@@ -256,7 +280,7 @@ async def deactivate_rule_version(
     rule.is_active = False
 
     # Log the deactivation in audit log
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = _safe_client_ip(request)
     user_agent = request.headers.get("user-agent", "unknown")
 
     audit_entry = AuditLog(
@@ -264,16 +288,16 @@ async def deactivate_rule_version(
         action="deactivate_rule",
         resource_type="as1851_rule",
         resource_id=rule_id,
-        old_values=json.dumps({
+        old_values={
             "is_active": True,
             "rule_code": rule.rule_code,
             "version": rule.version
-        }),
-        new_values=json.dumps({
+        },
+        new_values={
             "is_active": False,
             "rule_code": rule.rule_code,
             "version": rule.version
-        }),
+        },
         ip_address=client_ip,
         user_agent=user_agent
     )
